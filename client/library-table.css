@@ -1,0 +1,126 @@
+.sidebar button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar button b {
+  min-width: 24px;
+  color: #64727b;
+  font-size: 0.68rem;
+  text-align: right;
+}
+.sidebar button.active b {
+  color: #9adce3;
+}
+.progress-copy {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+}
+.progress-copy strong {
+  color: #cbd5d9;
+}
+.progress-copy span {
+  font-weight: 400;
+}
+.progress-track {
+  width: 110px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #26323a;
+}
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.next-episode,
+.episode-date {
+  display: block;
+}
+.episode-date {
+  margin-top: 4px;
+  color: #74818a;
+  font-size: 0.68rem;
+}
+.poster img + span {
+  display: none;
+}
+.poster img[hidden] + span {
+  display: grid;
+}
+.filter-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 28px 10px;
+  color: #89969d;
+}
+.filter-empty button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #3a4a53;
+  border-radius: 5px;
+  background: #172127;
+  color: #b9dfe3;
+}
+.row-error {
+  display: block;
+  max-width: 190px;
+  margin-top: 5px;
+  color: #efafb7;
+  font-size: 0.68rem;
+  white-space: normal;
+}
+.quick-menu button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.view-badge,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 2px 7px;
+  border: 1px solid #35444d;
+  border-radius: 999px;
+  color: #bdc9ce;
+  font-size: 0.68rem;
+}
+.view-badge.continue {
+  border-color: #3c6f76;
+  color: #91dce4;
+}
+.view-badge.caught-up {
+  border-color: #43634b;
+  color: #9ed0a9;
+}
+.view-badge.watchlist,
+.status-badge {
+  border-color: #725f32;
+  color: #e3c56e;
+}
+.view-badge.finished {
+  border-color: #4d5872;
+  color: #afbfe2;
+}
+.view-badge.stopped {
+  border-color: #68464b;
+  color: #d59ba3;
+}
+@media (max-width: 720px) {
+  .library-table .mobile-hide {
+    display: none;
+  }
+  .library-table th,
+  .library-table td {
+    padding-right: 12px;
+  }
+  .progress-track {
+    width: 86px;
+  }
+}

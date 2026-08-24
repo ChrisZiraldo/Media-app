@@ -1,0 +1,91 @@
+.result-count {
+  margin-bottom: 5px;
+  color: #75828a;
+  font-size: 0.7rem;
+}
+.column-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sort-button,
+.filter-menu summary {
+  display: grid;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #778791;
+  cursor: pointer;
+  line-height: 1;
+}
+.sort-button.alpha {
+  display: flex;
+  width: 38px;
+  gap: 2px;
+  font-size: 0.62rem;
+}
+.sort-button.alpha span {
+  font-size: 0.88rem;
+}
+.sort-button:hover,
+.filter-menu summary:hover,
+.filter-menu.active summary {
+  border-color: #3a4a53;
+  background: #19242a;
+  color: var(--accent);
+}
+.filter-menu,
+.quick-menu {
+  position: relative;
+}
+.filter-menu summary,
+.quick-menu summary {
+  list-style: none;
+}
+.filter-menu summary::-webkit-details-marker,
+.quick-menu summary::-webkit-details-marker {
+  display: none;
+}
+.filter-menu > div,
+.quick-menu > div {
+  position: absolute;
+  z-index: 20;
+  top: 29px;
+  left: 0;
+  min-width: 150px;
+  padding: 5px;
+  border: 1px solid #394750;
+  border-radius: 6px;
+  background: #151c21;
+  box-shadow: 0 15px 40px #000a;
+}
+.filter-menu button,
+.quick-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #c3cdd1;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.filter-menu button:hover,
+.quick-menu button:hover {
+  background: #243139;
+}
+.quick-menu summary {
+  padding: 6px;
+  color: #829098;
+  cursor: pointer;
+}
+.quick-menu > div {
+  right: 0;
+  left: auto;
+}

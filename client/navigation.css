@@ -1,0 +1,34 @@
+@media (min-width: 721px) {
+  .layout {
+    transition: grid-template-columns 0.18s ease;
+  }
+  .sidebar {
+    min-width: 0;
+    transition: opacity 0.14s ease;
+  }
+  .sidebar-collapsed {
+    grid-template-columns: 0 1fr;
+  }
+  .sidebar-collapsed .sidebar {
+    visibility: hidden;
+    padding-right: 0;
+    padding-left: 0;
+    overflow: hidden;
+    border-right: 0;
+    opacity: 0;
+  }
+  .sidebar-collapsed .menu-toggle {
+    left: 0;
+  }
+}
+@media (max-width: 720px) {
+  .menu-toggle {
+    z-index: 50;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .layout,
+  .sidebar {
+    transition: none;
+  }
+}

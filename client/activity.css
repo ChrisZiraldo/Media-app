@@ -1,0 +1,26 @@
+.activity-list {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.activity-list article {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.activity-list small,
+.activity-list strong {
+  display: block;
+}
+.activity-list small {
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+.activity-list time {
+  color: #7e8b92;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}

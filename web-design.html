@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive design reference for the private Media Tracker application.">
+  <title>Media Tracker — Web Design Reference</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --canvas: #0b0d0f;
+      --surface: #111417;
+      --surface-raised: #181c20;
+      --surface-soft: #20252a;
+      --text: #f3f0e9;
+      --text-muted: #a7a49e;
+      --border: #2c3237;
+      --accent: #e59048;
+      --accent-hover: #f2a761;
+      --accent-contrast: #18110a;
+      --success: #73b38c;
+      --warning: #d9ab61;
+      --danger: #e47770;
+      --focus: #f4bd7e;
+      --movie: #c7895d;
+      --tv: #6ea2a8;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 22px;
+      --shadow: 0 18px 50px rgb(0 0 0 / 30%);
+      --max: 1440px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    button, input, select, textarea { font: inherit; }
+    button, a, input, select, textarea { outline-offset: 3px; }
+    :focus-visible { outline: 2px solid var(--focus); }
+    button { color: inherit; }
+    img { display: block; max-width: 100%; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2, h3 { line-height: 1.12; letter-spacing: -.025em; }
+    h1 { font-size: clamp(2rem, 5vw, 4.5rem); max-width: 850px; }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.7rem); }
+    h3 { font-size: 1.05rem; }
+    a { color: inherit; }
+    .eyebrow {
+      margin-bottom: 12px;
+      color: var(--accent);
+      font-size: .76rem;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .muted { color: var(--text-muted); }
+    .small { font-size: .84rem; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -70px;
+      z-index: 100;
+      padding: 12px 16px;
+      background: var(--accent);
+      color: var(--accent-contrast);
+      border-radius: var(--radius-sm);
+    }
+    .skip-link:focus { top: 16px; }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 72px;
+      padding: 0 max(24px, calc((100vw - var(--max)) / 2));
+      border-bottom: 1px solid rgb(255 255 255 / 8%);
+      background: rgb(11 13 15 / 88%);
+      backdrop-filter: blur(18px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 750; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      aspect-ratio: 1;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+      color: var(--accent);
+    }
+    .brand-mark::after { content: "▶"; font-size: .72rem; transform: translateX(1px); }
+    .site-nav { display: flex; gap: 4px; }
+    .site-nav button {
+      min-height: 44px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .site-nav button[aria-selected="true"] { background: var(--surface-soft); color: var(--text); }
+    .private-label { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: .82rem; }
+    .private-label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+
+    main { max-width: var(--max); margin: 0 auto; padding: 0 24px 96px; }
+    .page { display: none; }
+    .page.is-active { display: block; animation: reveal .24s ease-out; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(5px); } }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+      gap: clamp(36px, 7vw, 96px);
+      align-items: end;
+      min-height: 620px;
+      padding: 100px 0 72px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero p { max-width: 680px; color: var(--text-muted); font-size: clamp(1rem, 2vw, 1.25rem); }
+    .hero-art {
+      position: relative;
+      min-height: 440px;
+    }
+    .hero-poster {
+      position: absolute;
+      width: min(44%, 210px);
+      aspect-ratio: 2 / 3;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+    }
+    .hero-poster img { width: 100%; height: 100%; object-fit: cover; }
+    .hero-poster:nth-child(1) { left: 3%; bottom: 4%; transform: rotate(-6deg); }
+    .hero-poster:nth-child(2) { left: 31%; top: 0; z-index: 2; transform: rotate(2deg); }
+    .hero-poster:nth-child(3) { right: 2%; bottom: 10%; transform: rotate(7deg); }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+    .chip, .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: .76rem;
+    }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .status.watching { color: var(--accent); border-color: rgb(229 144 72 / 45%); background: rgb(229 144 72 / 8%); }
+    .status.watched { color: var(--success); border-color: rgb(115 179 140 / 40%); background: rgb(115 179 140 / 8%); }
+    .status.watchlist { color: #9eb5cf; border-color: rgb(158 181 207 / 35%); background: rgb(158 181 207 / 7%); }
+    .status.dropped { color: var(--text-muted); }
+
+    .section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+    .section-heading { display: grid; grid-template-columns: 1fr minmax(280px, .7fr); gap: 48px; align-items: end; margin-bottom: 40px; }
+    .section-heading p { margin-bottom: 0; color: var(--text-muted); }
+    .principles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    .principle { min-height: 210px; padding: 24px; background: var(--canvas); }
+    .principle-index { color: var(--accent); font-size: .75rem; margin-bottom: 48px; }
+    .principle p { color: var(--text-muted); font-size: .88rem; }
+
+    .prototype-shell {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: #0c0f11;
+      box-shadow: var(--shadow);
+    }
+    .chosen-prototype-frame {
+      display: block;
+      width: 100%;
+      height: 820px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .prototype-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      background: #111416;
+    }
+    .prototype-brand { font-weight: 750; }
+    .prototype-brand span { color: var(--accent); }
+    .prototype-tabs { display: flex; gap: 2px; }
+    .prototype-tabs button {
+      min-height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .prototype-tabs button.is-active { background: var(--surface-soft); color: var(--text); }
+    .prototype-content { padding: clamp(20px, 4vw, 44px); }
+    .view { display: none; }
+    .view.is-active { display: block; }
+    .view-heading { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 30px; }
+    .view-heading h2 { margin-bottom: 5px; font-size: clamp(1.65rem, 4vw, 2.8rem); }
+
+    .smart-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .smart-tabs button {
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .smart-tabs button[aria-pressed="true"] { border-color: var(--accent); background: rgb(229 144 72 / 10%); color: var(--text); }
+
+    .filters { display: grid; grid-template-columns: minmax(180px, 1.3fr) repeat(3, minmax(130px, .55fr)); gap: 10px; margin-bottom: 28px; }
+    .field label { display: block; margin-bottom: 7px; color: var(--text-muted); font-size: .76rem; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+    }
+    .field textarea { min-height: 108px; resize: vertical; }
+    .result-count { color: var(--text-muted); font-size: .84rem; margin-bottom: 14px; }
+    .media-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 2vw, 24px); }
+    .media-card { min-width: 0; }
+    .poster-button {
+      position: relative;
+      display: block;
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      overflow: hidden;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    .poster-button img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+    .poster-button:hover img { transform: scale(1.025); }
+    .card-state { position: absolute; top: 10px; left: 10px; background: rgb(11 13 15 / 90%); backdrop-filter: blur(8px); }
+    .card-copy { padding-top: 13px; }
+    .card-title { margin: 0 0 5px; font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-meta { display: flex; gap: 8px; color: var(--text-muted); font-size: .78rem; }
+    .progress-label { margin: 10px 0 6px; color: var(--text-muted); font-size: .75rem; }
+    .progress-track { height: 4px; overflow: hidden; border-radius: 999px; background: var(--surface-soft); }
+    .progress-bar { height: 100%; border-radius: inherit; background: var(--accent); }
+    .next-action {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 13px;
+      padding: 12px;
+      border: 1px solid rgb(229 144 72 / 35%);
+      border-radius: var(--radius-sm);
+      background: rgb(229 144 72 / 7%);
+    }
+    .next-action strong { display: block; font-size: .86rem; }
+    .next-action span { color: var(--text-muted); font-size: .74rem; }
+    .next-action .btn { flex: 0 0 auto; min-height: 38px; padding-inline: 12px; }
+
+    .upcoming-list, .diary-list { border-top: 1px solid var(--border); }
+    .upcoming-item, .diary-item {
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      min-height: 92px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .upcoming-item img, .diary-item img { width: 60px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 6px; }
+    .upcoming-item h3, .diary-item h3 { margin-bottom: 4px; }
+    .upcoming-date, .diary-time { color: var(--text-muted); font-size: .8rem; text-align: right; }
+    .diary-day { margin: 30px 0 8px; color: var(--text-muted); font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+    .diary-empty { padding: 32px 0; color: var(--text-muted); }
+
+    .search-box { max-width: 760px; margin-bottom: 28px; }
+    .search-row { display: grid; grid-template-columns: 1fr 150px; gap: 10px; }
+    .search-status { min-height: 24px; margin-top: 8px; color: var(--text-muted); font-size: .82rem; }
+    .search-result {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr) 180px;
+      gap: 22px;
+      align-items: center;
+      padding: 20px 0;
+      border-top: 1px solid var(--border);
+    }
+    .search-result img { width: 112px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-sm); }
+    .search-result h3 { margin-bottom: 7px; }
+    .search-result p { margin-bottom: 0; color: var(--text-muted); font-size: .87rem; }
+    .result-action { display: grid; gap: 9px; }
+    .result-action select { width: 100%; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-raised);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .btn:hover { border-color: #515960; }
+    .btn-primary { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+    .btn-primary:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
+    .btn-danger { border-color: rgb(228 119 112 / 45%); color: var(--danger); background: rgb(228 119 112 / 8%); }
+    .btn-ghost { background: transparent; }
+    .btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+    .detail-layout { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 2.3fr); gap: clamp(28px, 5vw, 68px); }
+    .detail-poster img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-md); }
+    .detail-title-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: start; }
+    .detail-title-row h2 { margin-bottom: 8px; }
+    .detail-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 24px; color: var(--text-muted); font-size: .84rem; }
+    .synopsis { max-width: 750px; color: #cfcbc4; }
+    .detail-controls { display: grid; grid-template-columns: minmax(180px, .55fr) minmax(260px, 1fr); gap: 16px; margin: 30px 0; }
+    .progress-summary { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; margin: 34px 0 22px; }
+    .progress-number { color: var(--accent); font-size: 2rem; font-weight: 750; }
+    .season-row { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 30px 0 10px; }
+    .episode-list { border-top: 1px solid var(--border); }
+    .episode {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      min-height: 66px;
+      border-bottom: 1px solid var(--border);
+    }
+    .episode-number { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .episode label { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+    .episode input { width: 19px; height: 19px; accent-color: var(--accent); }
+    .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--border); }
+
+    dialog {
+      width: min(520px, calc(100% - 32px));
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-raised);
+      color: var(--text);
+      box-shadow: 0 30px 100px rgb(0 0 0 / 70%);
+    }
+    dialog::backdrop { background: rgb(2 3 4 / 75%); backdrop-filter: blur(5px); }
+    .dialog-body { padding: 28px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 28px; }
+
+    .states-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .state-sample { min-height: 190px; padding: 22px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+    .state-sample p { color: var(--text-muted); }
+    .skeleton { display: grid; gap: 10px; margin-top: 20px; }
+    .skeleton span { display: block; height: 11px; border-radius: 99px; background: linear-gradient(90deg, var(--surface-soft), #30363b, var(--surface-soft)); background-size: 200% 100%; animation: shimmer 1.8s infinite linear; }
+    .skeleton span:nth-child(2) { width: 72%; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .inline-error { margin-top: 20px; padding-left: 12px; border-left: 3px solid var(--danger); color: var(--danger); }
+
+    .tokens { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+    .swatch { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+    .swatch-color { height: 92px; }
+    .swatch-copy { padding: 12px; font-size: .75rem; }
+    .swatch-copy code { display: block; margin-top: 3px; color: var(--text-muted); }
+    .type-specimen { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+    .type-display { font-size: clamp(2.5rem, 8vw, 6rem); line-height: .9; letter-spacing: -.06em; }
+    .spacing-scale { display: grid; gap: 14px; }
+    .space-item { display: grid; grid-template-columns: 48px 1fr 60px; gap: 12px; align-items: center; color: var(--text-muted); font-size: .8rem; }
+    .space-bar { height: 12px; background: var(--accent); opacity: .75; }
+
+    .architecture { display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 14px; margin: 42px 0; }
+    .arch-node { min-height: 128px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+    .arch-node strong { display: block; margin-bottom: 7px; }
+    .arch-node span { color: var(--text-muted); font-size: .8rem; }
+    .arch-arrow { color: var(--accent); text-align: center; font-size: 1.3rem; }
+    .boundary-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    .boundary { padding: 22px; background: var(--canvas); }
+    .boundary strong { color: var(--accent); }
+    .boundary p { margin: 6px 0 0; color: var(--text-muted); font-size: .88rem; }
+
+    .footer { display: flex; justify-content: space-between; gap: 24px; padding-top: 40px; color: var(--text-muted); font-size: .8rem; }
+
+    @media (max-width: 1050px) {
+      .private-label { display: none; }
+      .principles { grid-template-columns: repeat(3, 1fr); }
+      .media-grid { grid-template-columns: repeat(3, 1fr); }
+      .tokens { grid-template-columns: repeat(3, 1fr); }
+      .architecture { grid-template-columns: 1fr auto 1fr; }
+      .architecture .arch-node:nth-of-type(3) { grid-column: 1; }
+    }
+    @media (max-width: 760px) {
+      .site-header { align-items: start; flex-direction: column; padding: 14px 18px; }
+      .site-nav { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+      .site-nav button { white-space: nowrap; }
+      main { padding: 0 16px 64px; }
+      .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 64px; }
+      .hero-art { min-height: 380px; }
+      .section { padding: 58px 0; }
+      .section-heading { grid-template-columns: 1fr; gap: 10px; }
+      .principles { grid-template-columns: 1fr; }
+      .principle { min-height: auto; }
+      .principle-index { margin-bottom: 22px; }
+      .prototype-topbar { align-items: start; flex-direction: column; }
+      .prototype-tabs { width: 100%; overflow-x: auto; }
+      .filters { grid-template-columns: 1fr 1fr; }
+      .media-grid { grid-template-columns: repeat(2, 1fr); }
+      .search-row, .search-result { grid-template-columns: 1fr; }
+      .search-result img { width: min(180px, 44vw); }
+      .result-action { grid-template-columns: 1fr 1fr; }
+      .detail-layout, .detail-controls { grid-template-columns: 1fr; }
+      .detail-poster { max-width: 250px; }
+      .states-grid, .type-specimen, .boundary-list { grid-template-columns: 1fr; }
+      .architecture { grid-template-columns: 1fr; }
+      .arch-arrow { transform: rotate(90deg); }
+      .architecture .arch-node:nth-of-type(3) { grid-column: auto; }
+      .footer { flex-direction: column; }
+      .upcoming-item, .diary-item { grid-template-columns: 64px minmax(0, 1fr); }
+      .upcoming-date, .diary-time { grid-column: 2; text-align: left; }
+    }
+    @media (max-width: 460px) {
+      .filters, .result-action, .tokens { grid-template-columns: 1fr; }
+      .media-grid { gap: 12px; }
+      .card-meta { flex-direction: column; gap: 2px; }
+      .episode { grid-template-columns: 38px 1fr; padding: 9px 0; }
+      .episode label { grid-column: 2; }
+      .danger-zone { align-items: stretch; flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span> Media Tracker</div>
+    <nav class="site-nav" aria-label="Design document sections" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-page="vision">Vision</button>
+      <button type="button" role="tab" aria-selected="false" data-page="prototype">Prototype</button>
+      <button type="button" role="tab" aria-selected="false" data-page="system">System</button>
+      <button type="button" role="tab" aria-selected="false" data-page="architecture">Architecture</button>
+    </nav>
+    <a class="private-label" href="ui-concepts.html">Open compact prototype</a>
+  </header>
+
+  <main id="content">
+    <section class="page is-active" id="page-vision" aria-labelledby="vision-title">
+      <div class="hero">
+        <div>
+          <div class="eyebrow">Product direction · V1</div>
+          <h1 id="vision-title">A calm, private home for everything you watch.</h1>
+          <p>Library-first media tracking with deliberate progress, explicit status changes, and a quiet cinematic interface that stays out of the way.</p>
+          <div class="hero-meta" aria-label="Core product qualities">
+            <span class="chip">Private by default</span>
+            <span class="chip">Explicit mutations</span>
+            <span class="chip">Desktop + mobile</span>
+            <span class="chip">Hermes ready</span>
+          </div>
+        </div>
+        <div class="hero-art" aria-label="Media artwork sourced from TMDB">
+          <div class="hero-poster"><img src="assets/design/dune-part-two.jpg" alt="Dune: Part Two poster"></div>
+          <div class="hero-poster"><img src="assets/design/severance.jpg" alt="Severance poster"></div>
+          <div class="hero-poster"><img src="assets/design/the-bear.jpg" alt="The Bear poster"></div>
+        </div>
+      </div>
+
+      <section class="section" aria-labelledby="principles-title">
+        <div class="section-heading">
+          <div><div class="eyebrow">Foundation</div><h2 id="principles-title">Five principles shape every screen.</h2></div>
+          <p>The interface prioritizes recognition and confidence. Discovery supports the collection instead of competing with it.</p>
+        </div>
+        <div class="principles">
+          <article class="principle"><div class="principle-index">01</div><h3>Private by default</h3><p>No public profiles, social layer, or accidental public exposure.</p></article>
+          <article class="principle"><div class="principle-index">02</div><h3>Explicit state</h3><p>Every add, status change, episode check, and removal is intentional.</p></article>
+          <article class="principle"><div class="principle-index">03</div><h3>Library first</h3><p>The collection is the default destination; search is a focused supporting tool.</p></article>
+          <article class="principle"><div class="principle-index">04</div><h3>Clear recovery</h3><p>Pending and failed actions preserve context and always offer a way forward.</p></article>
+          <article class="principle"><div class="principle-index">05</div><h3>Useful density</h3><p>Artwork aids recognition while status and progress remain easy to scan.</p></article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="journey-title">
+        <div class="section-heading">
+          <div><div class="eyebrow">Primary loop</div><h2 id="journey-title">Find. Place. Progress.</h2></div>
+          <p>Three verbs cover the recurring workflow: find a title, place it in the right status, and record progress without inference.</p>
+        </div>
+        <div class="architecture">
+          <div class="arch-node"><strong>01 · Find</strong><span>Search movies, television, or both after two meaningful characters.</span></div>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <div class="arch-node"><strong>02 · Place</strong><span>Add once to Watchlist, Watching, Watched, or Dropped.</span></div>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <div class="arch-node"><strong>03 · Progress</strong><span>Record explicit movie status or individual episode history.</span></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="page" id="page-prototype" aria-labelledby="prototype-title">
+      <section class="section">
+        <div class="section-heading">
+          <div><div class="eyebrow">Chosen interface</div><h1 id="prototype-title">Compact Tracker prototype</h1></div>
+          <p>The approved information-dense direction, including To Watch, Continue, Caught Up, Upcoming, Diary, and episode-progress views.</p>
+        </div>
+
+        <iframe class="chosen-prototype-frame" src="ui-concepts.html" title="Interactive Compact Tracker prototype"></iframe>
+
+        <div class="prototype-shell" hidden aria-hidden="true">
+          <div class="prototype-topbar">
+            <div class="prototype-brand">Media <span>Tracker</span></div>
+            <div class="prototype-tabs" role="tablist" aria-label="Application views">
+              <button type="button" class="is-active" role="tab" aria-selected="true" data-view="library">Library</button>
+              <button type="button" role="tab" aria-selected="false" data-view="search">Search</button>
+              <button type="button" role="tab" aria-selected="false" data-view="detail">Series detail</button>
+              <button type="button" role="tab" aria-selected="false" data-view="diary">Diary</button>
+            </div>
+          </div>
+          <div class="prototype-content">
+            <section class="view is-active" id="view-library" aria-labelledby="library-title">
+              <div class="view-heading"><div><h2 id="library-title">Your library</h2><div class="muted small">Four sample titles via TMDB · personal statuses are prototype data</div></div><span class="status watching">2 active · 1 caught up</span></div>
+              <div class="smart-tabs" aria-label="Library views">
+                <button type="button" aria-pressed="true" data-smart-view="all">All</button>
+                <button type="button" aria-pressed="false" data-smart-view="continue">Continue watching</button>
+                <button type="button" aria-pressed="false" data-smart-view="caught-up">Caught up</button>
+                <button type="button" aria-pressed="false" data-smart-view="upcoming">Upcoming</button>
+              </div>
+              <div class="filters">
+                <div class="field"><label for="library-query">Filter by title</label><input id="library-query" type="search" placeholder="Start typing…"></div>
+                <div class="field"><label for="library-type">Type</label><select id="library-type"><option value="all">All types</option><option value="movie">Movies</option><option value="tv">TV</option></select></div>
+                <div class="field"><label for="library-status">Status</label><select id="library-status"><option value="all">All statuses</option><option value="to-watch">To watch · episodes available</option><option value="watchlist">Watchlist</option><option value="watching">Watching</option><option value="watched">Watched</option><option value="dropped">Dropped</option></select></div>
+                <div class="field"><label for="library-sort">Sort</label><select id="library-sort"><option>Recently updated</option><option>Title</option></select></div>
+              </div>
+              <div class="result-count" id="library-count" aria-live="polite">4 titles</div>
+              <div class="media-grid" id="media-grid">
+                <article class="media-card" data-title="Dune: Part Two" data-type="movie" data-status="watching" data-smart="continue">
+                  <button class="poster-button" type="button" data-open-detail aria-label="Open Dune: Part Two details"><img src="assets/design/dune-part-two.jpg" alt=""><span class="status watching card-state">Watching</span></button>
+                  <div class="card-copy"><h3 class="card-title">Dune: Part Two</h3><div class="card-meta"><span>Movie</span><span>2024 · 2h 47m</span></div></div>
+                </article>
+                <article class="media-card" data-title="Severance" data-type="tv" data-status="watching" data-smart="continue to-watch">
+                  <button class="poster-button" type="button" data-open-detail aria-label="Open Severance details"><img src="assets/design/severance.jpg" alt=""><span class="status watching card-state">Watching</span></button>
+                  <div class="card-copy"><h3 class="card-title">Severance</h3><div class="card-meta"><span>TV</span><span>2022 · 3 seasons</span></div><div class="progress-label">10 of 19 episodes</div><div class="progress-track" aria-label="10 of 19 episodes watched"><div class="progress-bar" style="width:52.6%"></div></div><div class="next-action"><div><strong data-card-next-number>Next: S2 E3</strong><span data-card-next-title>Who Is Alive?</span></div><button class="btn btn-ghost" type="button" data-next-episode>Open</button></div></div>
+                </article>
+                <article class="media-card" data-title="Past Lives" data-type="movie" data-status="watchlist">
+                  <button class="poster-button" type="button" data-open-detail aria-label="Open Past Lives details"><img src="assets/design/past-lives.jpg" alt=""><span class="status watchlist card-state">Watchlist</span></button>
+                  <div class="card-copy"><h3 class="card-title">Past Lives</h3><div class="card-meta"><span>Movie</span><span>2023 · 1h 46m</span></div></div>
+                </article>
+                <article class="media-card" data-title="The Bear" data-type="tv" data-status="watching" data-smart="caught-up">
+                  <button class="poster-button" type="button" data-open-detail aria-label="Open The Bear details"><img src="assets/design/the-bear.jpg" alt=""><span class="status watched card-state">Caught up</span></button>
+                  <div class="card-copy"><h3 class="card-title">The Bear</h3><div class="card-meta"><span>TV</span><span>2022 · 5 seasons</span></div><div class="progress-label">46 of 46 episodes</div><div class="progress-track" aria-label="46 of 46 episodes watched"><div class="progress-bar" style="width:100%"></div></div></div>
+                </article>
+              </div>
+              <div id="upcoming-view" hidden>
+                <div class="result-count">Dates come from catalog metadata; unknown dates remain explicit.</div>
+                <div class="upcoming-list">
+                  <article class="upcoming-item"><img src="assets/design/severance.jpg" alt=""><div><div class="eyebrow">Upcoming season</div><h3>Severance · Season 3</h3><div class="muted small">Still Watching · no status change inferred</div></div><div class="upcoming-date">Date not announced</div></article>
+                </div>
+              </div>
+            </section>
+
+            <section class="view" id="view-search" aria-labelledby="search-title">
+              <div class="view-heading"><div><h2 id="search-title">Find something</h2><div class="muted small">Search the TMDB catalog without leaving your private app.</div></div></div>
+              <div class="search-box">
+                <div class="search-row">
+                  <div class="field"><label for="catalog-query">Title</label><input id="catalog-query" type="search" value="severance" placeholder="Search movies and TV…"></div>
+                  <div class="field"><label for="catalog-type">Type</label><select id="catalog-type"><option>All</option><option>Movies</option><option>TV</option></select></div>
+                </div>
+                <div class="search-status" id="search-status" aria-live="polite">1 result for “severance”</div>
+              </div>
+              <div id="search-results">
+                <article class="search-result">
+                  <img src="assets/design/severance.jpg" alt="Poster for Severance">
+                  <div><div class="eyebrow">TV · 2022</div><h3>Severance</h3><p>Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives.</p></div>
+                  <div class="result-action"><select aria-label="Starting status for Severance"><option>Watchlist</option><option>Watching</option><option>Watched</option><option>Dropped</option></select><button class="btn" type="button" disabled>In library</button></div>
+                </article>
+                <article class="search-result secondary-result" hidden>
+                  <img src="assets/design/arrival.jpg" alt="Poster for Arrival">
+                  <div><div class="eyebrow">Movie · 2016</div><h3>Arrival</h3><p>After alien crafts land around the world, an expert linguist is recruited to determine whether they come in peace or are a threat.</p></div>
+                  <div class="result-action"><select aria-label="Starting status for Arrival"><option>Watchlist</option><option>Watching</option><option>Watched</option><option>Dropped</option></select><button class="btn btn-primary add-button" type="button">Add to library</button></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="view" id="view-detail" aria-labelledby="detail-title">
+              <div class="detail-layout">
+                <div class="detail-poster"><img src="assets/design/severance.jpg" alt="Poster for Severance"></div>
+                <div>
+                  <div class="detail-title-row"><div><div class="eyebrow">TV series</div><h2 id="detail-title">Severance</h2></div><span class="status watching">Watching</span></div>
+                  <div class="detail-meta"><span>First aired 2022</span><span>3 seasons</span><span>19 episodes</span></div>
+                  <p class="synopsis">Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives. When a mysterious colleague appears outside of work, it begins a journey to discover the truth about their jobs.</p>
+                  <div class="detail-controls">
+                    <div class="field"><label for="detail-status">Status</label><select id="detail-status"><option>Watchlist</option><option selected>Watching</option><option>Watched</option><option>Dropped</option></select></div>
+                    <div class="field"><label for="detail-note">Personal note</label><textarea id="detail-note" maxlength="2000">Continue with season two.</textarea><div class="muted small"><span id="note-count">25</span> / 2,000</div></div>
+                  </div>
+                  <button class="btn btn-primary" type="button" id="save-detail">Save changes</button>
+                  <span class="small muted" id="save-status" aria-live="polite"></span>
+
+                  <div class="progress-summary"><div class="progress-number" id="progress-number">10/19</div><div><strong id="progress-copy">10 of 19 episodes watched</strong><div class="progress-track" style="margin-top:8px"><div class="progress-bar" id="detail-progress" style="width:52.6%"></div></div></div></div>
+                  <div class="next-action" id="detail-next"><div><div class="eyebrow" style="margin-bottom:4px">Next unwatched</div><strong id="next-episode-label">S2 E3 · Who Is Alive?</strong><span>Derived from watched episode records</span></div><button class="btn btn-primary" type="button" id="mark-next">Mark watched</button></div>
+                  <div class="season-row"><div><h3 style="margin-bottom:4px">Episodes</h3><div class="muted small">Completion never changes series status automatically.</div></div><div class="field"><label for="season-select">Season</label><select id="season-select"><option>Season 1</option><option selected>Season 2</option><option>Specials</option></select></div></div>
+                  <div class="episode-list" id="episode-list">
+                    <div class="episode"><span class="episode-number">S2 E1</span><strong>Hello, Ms. Cobel</strong><label><input type="checkbox" checked> Watched</label></div>
+                    <div class="episode"><span class="episode-number">S2 E2</span><strong>Goodbye, Mrs. Selvig</strong><label><input type="checkbox" checked> Watched</label></div>
+                    <div class="episode"><span class="episode-number">S2 E3</span><strong>Who Is Alive?</strong><label><input type="checkbox"> Watched</label></div>
+                    <div class="episode"><span class="episode-number">S2 E4</span><strong>Woe's Hollow</strong><label><input type="checkbox"> Watched</label></div>
+                  </div>
+                  <div class="danger-zone"><div><strong>Remove from library</strong><div class="muted small">Deletes status, note, and recorded episode progress.</div></div><button class="btn btn-danger" type="button" id="remove-trigger">Remove from library</button></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="view" id="view-diary" aria-labelledby="diary-title">
+              <div class="view-heading"><div><h2 id="diary-title">Recent viewing</h2><div class="muted small">A chronological record of explicit viewing actions.</div></div><span class="chip">Local prototype history</span></div>
+              <div aria-live="polite" id="diary-live" class="sr-only"></div>
+              <div id="diary-feed">
+                <div class="diary-day">Today</div>
+                <div class="diary-list" id="diary-today">
+                  <article class="diary-item"><img src="assets/design/severance.jpg" alt=""><div><div class="eyebrow">Episode watched</div><h3>Severance · S2 E2</h3><div class="muted small">Goodbye, Mrs. Selvig</div></div><div class="diary-time">9:42 PM</div></article>
+                </div>
+                <div class="diary-day">Yesterday</div>
+                <div class="diary-list">
+                  <article class="diary-item"><img src="assets/design/dune-part-two.jpg" alt=""><div><div class="eyebrow">Status changed</div><h3>Dune: Part Two</h3><div class="muted small">Moved to Watching</div></div><div class="diary-time">8:15 PM</div></article>
+                </div>
+                <div class="diary-day">August 18</div>
+                <div class="diary-list">
+                  <article class="diary-item"><img src="assets/design/past-lives.jpg" alt=""><div><div class="eyebrow">Added to library</div><h3>Past Lives</h3><div class="muted small">Watchlist</div></div><div class="diary-time">6:04 PM</div></article>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="page" id="page-system" aria-labelledby="system-title">
+      <section class="section">
+        <div class="section-heading"><div><div class="eyebrow">Design system</div><h1 id="system-title">Cinematic, restrained, legible.</h1></div><p>Dark neutral layers support artwork; one warm accent marks primary actions. Status is always conveyed with text, never color alone.</p></div>
+        <div class="tokens" aria-label="Color tokens">
+          <div class="swatch"><div class="swatch-color" style="background:#0b0d0f"></div><div class="swatch-copy">Canvas<code>#0B0D0F</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#111417"></div><div class="swatch-copy">Surface<code>#111417</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#f3f0e9"></div><div class="swatch-copy">Text<code>#F3F0E9</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#e59048"></div><div class="swatch-copy">Accent<code>#E59048</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#73b38c"></div><div class="swatch-copy">Success<code>#73B38C</code></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#e47770"></div><div class="swatch-copy">Danger<code>#E47770</code></div></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><div><div class="eyebrow">Typography + rhythm</div><h2>System sans, editorial scale.</h2></div><p>Strong display hierarchy is reserved for product and title headings. Metadata stays compact but comfortably readable.</p></div>
+        <div class="type-specimen"><div><div class="type-display">Quietly cinematic.</div><p class="muted" style="margin-top:24px">Inter / system sans · 400, 500, 700 · tight display tracking</p></div><div class="spacing-scale" aria-label="Eight pixel spacing scale"><div class="space-item"><span>01</span><div class="space-bar" style="width:8px"></div><span>8 px</span></div><div class="space-item"><span>02</span><div class="space-bar" style="width:16px"></div><span>16 px</span></div><div class="space-item"><span>03</span><div class="space-bar" style="width:24px"></div><span>24 px</span></div><div class="space-item"><span>04</span><div class="space-bar" style="width:32px"></div><span>32 px</span></div><div class="space-item"><span>06</span><div class="space-bar" style="width:48px"></div><span>48 px</span></div><div class="space-item"><span>10</span><div class="space-bar" style="width:80px"></div><span>80 px</span></div></div></div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><div><div class="eyebrow">State coverage</div><h2>Design beyond the happy path.</h2></div><p>Every data region keeps its context through loading, emptiness, partial metadata, mutation, and failure.</p></div>
+        <div class="states-grid">
+          <article class="state-sample"><div class="eyebrow">Loading</div><h3>Loading your library</h3><div class="skeleton" aria-hidden="true"><span></span><span></span><span></span></div></article>
+          <article class="state-sample"><div class="eyebrow">Filtered empty</div><h3>No titles match these filters.</h3><p>Keep the filters visible and offer one direct recovery.</p><button class="btn" type="button">Clear filters</button></article>
+          <article class="state-sample"><div class="eyebrow">Recoverable error</div><h3>Episode unchanged</h3><div class="inline-error">Couldn’t update the episode. Try again.</div><button class="btn btn-ghost" type="button" style="margin-top:14px">Retry</button></article>
+          <article class="state-sample"><div class="eyebrow">Partial metadata</div><h3>Total episode count unavailable</h3><p>Show what is known instead of treating unknown as zero.</p></article>
+          <article class="state-sample"><div class="eyebrow">New library</div><h3>Your library is empty.</h3><p>Search for a movie or series to add it.</p><button class="btn btn-primary" type="button" data-jump-search>Search titles</button></article>
+          <article class="state-sample"><div class="eyebrow">Mutation pending</div><h3>Save only what changed</h3><p>Disable the responsible control. Leave unrelated interactions available.</p><button class="btn btn-primary" type="button" disabled>Saving…</button></article>
+        </div>
+      </section>
+    </section>
+
+    <section class="page" id="page-architecture" aria-labelledby="architecture-title">
+      <section class="section">
+        <div class="section-heading"><div><div class="eyebrow">System boundary</div><h1 id="architecture-title">One service, two interfaces, no leaked secrets.</h1></div><p>The browser and Hermes share domain behavior through MediaService. SQLite owns personal state; TMDB enriches the catalog.</p></div>
+        <div class="architecture" aria-label="Media Tracker system architecture">
+          <div class="arch-node"><strong>Tailnet browser</strong><span>Same-origin React client under /media/</span></div>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <div class="arch-node"><strong>Tailscale Serve</strong><span>Private HTTPS; strips the public path prefix</span></div>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <div class="arch-node"><strong>Fastify + MediaService</strong><span>Validated HTTP and shared domain rules on 127.0.0.1:3460</span></div>
+          <div class="arch-arrow" aria-hidden="true">↙</div>
+          <div class="arch-node"><strong>SQLite</strong><span>Canonical library, status, notes, and episode records</span></div>
+          <div class="arch-arrow" aria-hidden="true">↘</div>
+          <div class="arch-node"><strong>TMDB</strong><span>Server-side catalog enrichment only</span></div>
+        </div>
+        <div class="boundary-list">
+          <div class="boundary"><strong>Browser boundary</strong><p>React calls only same-origin /api/v1 routes. No TMDB key or direct catalog calls.</p></div>
+          <div class="boundary"><strong>MCP boundary</strong><p>Hermes invokes the same MediaService and requires confirm: true for removal.</p></div>
+          <div class="boundary"><strong>Data boundary</strong><p>Personal state stays local. Raw TMDB JSON, search history, and image files are not stored.</p></div>
+          <div class="boundary"><strong>Network boundary</strong><p>Loopback listener, Tailnet ingress only, no Funnel, and existing Serve routes remain intact.</p></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><div><div class="eyebrow">Domain invariants</div><h2>Rules the interface must communicate.</h2></div><p>These behaviors are not presentation choices; they are shared product guarantees across HTTP and Hermes.</p></div>
+        <div class="principles">
+          <article class="principle"><div class="principle-index">ID</div><h3>No duplicate title</h3><p>TMDB ID plus media type identifies one catalog title.</p></article>
+          <article class="principle"><div class="principle-index">TV</div><h3>Derived progress</h3><p>Episode rows determine progress; no second mutable counter exists.</p></article>
+          <article class="principle"><div class="principle-index">✓</div><h3>Explicit completion</h3><p>Checking the final episode never silently marks a series Watched.</p></article>
+          <article class="principle"><div class="principle-index">↻</div><h3>Safe retry</h3><p>Episode actions and repeat additions remain idempotent.</p></article>
+          <article class="principle"><div class="principle-index">!</div><h3>Confirmed removal</h3><p>Destructive deletion always names the title and requires confirmation.</p></article>
+        </div>
+      </section>
+    </section>
+
+    <footer class="footer"><span>Media Tracker web design reference · V1</span><span>Source: design.md + technical.md · Data and images from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</span></footer>
+  </main>
+
+  <dialog id="remove-dialog" aria-labelledby="remove-title" aria-describedby="remove-copy">
+    <div class="dialog-body">
+      <div class="eyebrow">Explicit confirmation</div>
+      <h2 id="remove-title">Remove Severance?</h2>
+      <p class="muted" id="remove-copy">This removes its status, personal note, and recorded episode progress from your library.</p>
+      <div class="dialog-actions"><button class="btn" type="button" id="cancel-remove">Cancel</button><button class="btn btn-danger" type="button" id="confirm-remove">Remove Severance</button></div>
+    </div>
+  </dialog>
+
+  <script>
+    const pageTabs = [...document.querySelectorAll('[data-page]')];
+    const pages = [...document.querySelectorAll('.page')];
+    const prototypeTabs = [...document.querySelectorAll('[data-view]')];
+    const views = [...document.querySelectorAll('.view')];
+
+    function showPage(name) {
+      pageTabs.forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.page === name)));
+      pages.forEach(page => page.classList.toggle('is-active', page.id === `page-${name}`));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showView(name) {
+      prototypeTabs.forEach(tab => {
+        const active = tab.dataset.view === name;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      views.forEach(view => view.classList.toggle('is-active', view.id === `view-${name}`));
+    }
+
+    pageTabs.forEach(tab => tab.addEventListener('click', () => showPage(tab.dataset.page)));
+    prototypeTabs.forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
+    document.querySelectorAll('[data-open-detail]').forEach(button => button.addEventListener('click', () => showView('detail')));
+    document.querySelectorAll('[data-jump-search]').forEach(button => button.addEventListener('click', () => { showPage('prototype'); showView('search'); }));
+
+    const libraryQuery = document.getElementById('library-query');
+    const libraryType = document.getElementById('library-type');
+    const libraryStatus = document.getElementById('library-status');
+    const libraryCount = document.getElementById('library-count');
+    const cards = [...document.querySelectorAll('.media-card')];
+    const smartButtons = [...document.querySelectorAll('[data-smart-view]')];
+    const upcomingView = document.getElementById('upcoming-view');
+    const mediaGrid = document.getElementById('media-grid');
+    const libraryFilters = document.querySelector('#view-library .filters');
+    let currentSmartView = 'all';
+
+    function filterLibrary() {
+      const query = libraryQuery.value.trim().toLowerCase();
+      let visible = 0;
+      const isUpcoming = currentSmartView === 'upcoming';
+      upcomingView.hidden = !isUpcoming;
+      mediaGrid.hidden = isUpcoming;
+      libraryFilters.hidden = isUpcoming;
+      if (isUpcoming) {
+        libraryCount.textContent = '1 upcoming season · date not announced';
+        return;
+      }
+      cards.forEach(card => {
+        const matchesStatus = libraryStatus.value === 'all' ||
+          card.dataset.status === libraryStatus.value ||
+          (libraryStatus.value === 'to-watch' && (card.dataset.smart || '').split(' ').includes('to-watch'));
+        const match = card.dataset.title.toLowerCase().includes(query) &&
+          (libraryType.value === 'all' || card.dataset.type === libraryType.value) &&
+          matchesStatus &&
+          (currentSmartView === 'all' || (card.dataset.smart || '').split(' ').includes(currentSmartView));
+        card.hidden = !match;
+        if (match) visible += 1;
+      });
+      libraryCount.textContent = visible === 1 ? '1 title' : `${visible} titles`;
+    }
+    [libraryQuery, libraryType, libraryStatus].forEach(control => control.addEventListener('input', filterLibrary));
+    smartButtons.forEach(button => button.addEventListener('click', () => {
+      currentSmartView = button.dataset.smartView;
+      smartButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+      filterLibrary();
+    }));
+    document.querySelectorAll('[data-next-episode]').forEach(button => button.addEventListener('click', () => {
+      showView('detail');
+      document.getElementById('mark-next').focus();
+    }));
+
+    const catalogQuery = document.getElementById('catalog-query');
+    const searchStatus = document.getElementById('search-status');
+    const secondaryResult = document.querySelector('.secondary-result');
+    catalogQuery.addEventListener('input', () => {
+      const query = catalogQuery.value.trim();
+      if (query.length < 2) {
+        searchStatus.textContent = 'Enter at least 2 characters to search.';
+        secondaryResult.hidden = true;
+      } else if (query.toLowerCase().includes('arrival')) {
+        searchStatus.textContent = '1 result for “arrival”';
+        document.querySelector('.search-result:not(.secondary-result)').hidden = true;
+        secondaryResult.hidden = false;
+      } else {
+        searchStatus.textContent = `1 result for “${query}”`;
+        document.querySelector('.search-result:not(.secondary-result)').hidden = false;
+        secondaryResult.hidden = true;
+      }
+    });
+    document.querySelector('.add-button').addEventListener('click', event => {
+      event.currentTarget.textContent = 'In library';
+      event.currentTarget.disabled = true;
+      event.currentTarget.classList.remove('btn-primary');
+      searchStatus.textContent = 'Arrival added to Watchlist.';
+    });
+
+    const note = document.getElementById('detail-note');
+    const noteCount = document.getElementById('note-count');
+    noteCount.textContent = note.value.length;
+    note.addEventListener('input', () => { noteCount.textContent = note.value.length; });
+    document.getElementById('save-detail').addEventListener('click', event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = 'Saving…';
+      setTimeout(() => {
+        button.disabled = false;
+        button.textContent = 'Save changes';
+        document.getElementById('save-status').textContent = ' Changes saved.';
+      }, 650);
+    });
+
+    const episodeChecks = [...document.querySelectorAll('#episode-list input')];
+    const episodeDetails = [
+      { number: 'S2 E1', title: 'Hello, Ms. Cobel' },
+      { number: 'S2 E2', title: 'Goodbye, Mrs. Selvig' },
+      { number: 'S2 E3', title: 'Who Is Alive?' },
+      { number: 'S2 E4', title: "Woe's Hollow" }
+    ];
+    const markNextButton = document.getElementById('mark-next');
+
+    function addDiaryEntry(index, watched) {
+      const item = document.createElement('article');
+      item.className = 'diary-item';
+      const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date());
+      item.innerHTML = `<img src="assets/design/severance.jpg" alt=""><div><div class="eyebrow">Episode ${watched ? 'watched' : 'marked unwatched'}</div><h3>Severance · ${episodeDetails[index].number}</h3><div class="muted small">${episodeDetails[index].title}</div></div><div class="diary-time">${time}</div>`;
+      document.getElementById('diary-today').prepend(item);
+      document.getElementById('diary-live').textContent = `${episodeDetails[index].number} ${watched ? 'added to' : 'removed from'} recent viewing.`;
+    }
+
+    function updateEpisodeState(changedIndex, recordHistory = true) {
+      const watchedInSeason = episodeChecks.filter(item => item.checked).length;
+      const watchedTotal = 8 + watchedInSeason;
+      document.getElementById('progress-number').textContent = `${watchedTotal}/19`;
+      document.getElementById('progress-copy').textContent = `${watchedTotal} of 19 episodes watched`;
+      document.getElementById('detail-progress').style.width = `${(watchedTotal / 19) * 100}%`;
+      const nextIndex = episodeChecks.findIndex(item => !item.checked);
+      const detailNext = document.getElementById('detail-next');
+      if (nextIndex >= 0) {
+        document.getElementById('next-episode-label').textContent = `${episodeDetails[nextIndex].number} · ${episodeDetails[nextIndex].title}`;
+        document.querySelector('[data-card-next-number]').textContent = `Next: ${episodeDetails[nextIndex].number}`;
+        document.querySelector('[data-card-next-title]').textContent = episodeDetails[nextIndex].title;
+        markNextButton.disabled = false;
+        detailNext.hidden = false;
+      } else {
+        document.getElementById('next-episode-label').textContent = 'Next episode is outside this sample season list';
+        document.querySelector('[data-card-next-number]').textContent = 'Next episode';
+        document.querySelector('[data-card-next-title]').textContent = 'More episode metadata required';
+        markNextButton.disabled = true;
+      }
+      if (recordHistory && changedIndex >= 0) addDiaryEntry(changedIndex, episodeChecks[changedIndex].checked);
+    }
+
+    episodeChecks.forEach((check, index) => check.addEventListener('change', () => updateEpisodeState(index)));
+    markNextButton.addEventListener('click', () => {
+      const nextIndex = episodeChecks.findIndex(item => !item.checked);
+      if (nextIndex < 0) return;
+      episodeChecks[nextIndex].checked = true;
+      updateEpisodeState(nextIndex);
+      episodeChecks[nextIndex].focus();
+    });
+
+    const dialog = document.getElementById('remove-dialog');
+    document.getElementById('remove-trigger').addEventListener('click', () => dialog.showModal());
+    document.getElementById('cancel-remove').addEventListener('click', () => dialog.close());
+    document.getElementById('confirm-remove').addEventListener('click', event => {
+      event.currentTarget.disabled = true;
+      event.currentTarget.textContent = 'Removing…';
+      setTimeout(() => {
+        dialog.close();
+        event.currentTarget.disabled = false;
+        event.currentTarget.textContent = 'Remove Severance';
+        showView('library');
+        const severanceCard = cards.find(card => card.dataset.title === 'Severance');
+        severanceCard.hidden = true;
+        libraryCount.textContent = '3 titles · Severance removed';
+      }, 650);
+    });
+  </script>
+</body>
+</html>

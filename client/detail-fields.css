@@ -1,0 +1,45 @@
+.synopsis {
+  max-width: 70ch;
+  color: #a6b0b5;
+  line-height: 1.55;
+}
+.detail-field textarea,
+.detail-field select {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #394851;
+  border-radius: 5px;
+  background: #0d1418;
+  color: #dbe2e6;
+  resize: vertical;
+}
+.note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 7px;
+}
+.note-actions button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #39717a;
+  border-radius: 5px;
+  background: #183c42;
+  color: #dffbff;
+}
+.save-state {
+  color: #91cbd1;
+  font-size: 0.72rem;
+}
+.episode-list .row-error {
+  grid-column: 2 / -1;
+}
+.avatar img + span {
+  display: none;
+}
+.avatar img[hidden] + span {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: #9ab1ba;
+}

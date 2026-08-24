@@ -1,0 +1,51 @@
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+.settings-grid article {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #11181d;
+}
+.settings-grid article h2 {
+  margin-top: 0;
+}
+.settings-grid article p {
+  min-height: 42px;
+  color: #87939a;
+  font-size: 0.78rem;
+}
+.settings-grid button,
+.file-button {
+  display: inline-grid;
+  min-height: 38px;
+  padding: 0 12px;
+  place-items: center;
+  border: 1px solid #3d4d56;
+  border-radius: 5px;
+  background: #192228;
+  color: #dbe2e6;
+  cursor: pointer;
+}
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.settings-grid > .notice {
+  grid-column: 1/-1;
+  margin-top: 0;
+}
+@media (max-width: 650px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-grid > .notice {
+    grid-column: auto;
+  }
+}

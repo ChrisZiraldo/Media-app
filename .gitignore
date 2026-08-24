@@ -1,0 +1,17 @@
+# Local credentials and environment overrides
+.env
+.env.*
+env
+
+# Runtime data
+*.db
+*.db-shm
+*.db-wal
+data/
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local editor state
+.vs/

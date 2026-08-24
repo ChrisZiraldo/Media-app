@@ -185,16 +185,16 @@ Use `404` for unknown library entries, `409` only for a real state conflict, `40
 
 Implement a native stdio MCP entry point at `server/mcp-main.ts`. Register it with Hermes only after it has been compiled and deployed. Initial tool set:
 
-| Tool | Mutation | Purpose |
-| --- | --- | --- |
-| `search_media` | No | Search TMDB catalog by title/type. |
-| `list_media_library` | No | Filter tracked media by type/status/query. |
-| `get_media_details` | No | Get one tracked entry plus progress. |
-| `add_media_to_library` | Yes | Add a TMDB movie/series with explicit status. |
-| `update_media_status` | Yes | Change status/note of an existing entry. |
-| `mark_episode_watched` | Yes | Mark/unmark one explicit series episode. |
-| `remove_media_from_library` | Yes, destructive | Require `confirm: true` in the tool input. |
-| `get_media_service_status` | No | Safe service/database/TMDB availability status. |
+| Tool                        | Mutation         | Purpose                                         |
+| --------------------------- | ---------------- | ----------------------------------------------- |
+| `search_media`              | No               | Search TMDB catalog by title/type.              |
+| `list_media_library`        | No               | Filter tracked media by type/status/query.      |
+| `get_media_details`         | No               | Get one tracked entry plus progress.            |
+| `add_media_to_library`      | Yes              | Add a TMDB movie/series with explicit status.   |
+| `update_media_status`       | Yes              | Change status/note of an existing entry.        |
+| `mark_episode_watched`      | Yes              | Mark/unmark one explicit series episode.        |
+| `remove_media_from_library` | Yes, destructive | Require `confirm: true` in the tool input.      |
+| `get_media_service_status`  | No               | Safe service/database/TMDB availability status. |
 
 MCP design requirements:
 

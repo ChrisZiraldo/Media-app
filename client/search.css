@@ -1,0 +1,28 @@
+.search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.search input {
+  min-width: 0;
+  border-radius: 6px 0 0 6px;
+}
+.search select {
+  height: 38px;
+  padding: 0 30px 0 10px;
+  border: 1px solid #33414a;
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  background: #151d22;
+  color: #c5d0d5;
+}
+@media (max-width: 420px) {
+  .search select {
+    max-width: 92px;
+    padding-left: 7px;
+  }
+}
+.search-state {
+  margin: 0;
+  padding: 18px 14px;
+  color: #a8b4ba;
+}

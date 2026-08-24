@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 342 513" role="img" aria-labelledby="title desc">
+  <title id="title">Media Tracker poster placeholder</title>
+  <desc id="desc">Abstract dark poster used when title artwork is unavailable.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#314650"/>
+      <stop offset="1" stop-color="#10171c"/>
+    </linearGradient>
+  </defs>
+  <rect width="342" height="513" rx="18" fill="url(#bg)"/>
+  <circle cx="171" cy="216" r="67" fill="none" stroke="#83b4bf" stroke-width="12" opacity=".72"/>
+  <path d="M151 177l65 39-65 39z" fill="#b8d8df" opacity=".9"/>
+  <text x="171" y="342" fill="#d9e5e7" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle">MEDIA / TRACKER</text>
+  <text x="171" y="376" fill="#8ea1a8" font-family="Arial, sans-serif" font-size="16" text-anchor="middle">ARTWORK UNAVAILABLE</text>
+</svg>
