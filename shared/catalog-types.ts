@@ -33,12 +33,43 @@ export interface CatalogEpisode {
   stillPath: string | null;
 }
 
+export interface CatalogEpisodeDetail extends CatalogEpisode {
+  cast: CastMember[];
+}
+
 export interface CastMember {
   tmdbPersonId: number;
   name: string;
   characterName: string | null;
   profilePath: string | null;
   sortOrder: number;
+}
+
+export interface PersonDetail {
+  tmdbPersonId: number;
+  name: string;
+  biography: string | null;
+  birthday: string | null;
+  deathday: string | null;
+  placeOfBirth: string | null;
+  knownForDepartment: string | null;
+  profilePath: string | null;
+  alsoKnownAs: string[];
+  gender: string | null;
+  homepage: string | null;
+  imdbId: string | null;
+  popularity: number | null;
+  knownCredits: PersonCredit[];
+}
+
+export interface PersonCredit {
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  title: string;
+  characterName: string | null;
+  year: string | null;
+  posterPath: string | null;
+  episodeCount: number | null;
 }
 
 export interface WatchProvider {

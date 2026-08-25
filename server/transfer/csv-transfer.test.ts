@@ -22,6 +22,7 @@ describe("episode CSV transfer", () => {
           networkName: "Test",
         },
         status: "watching",
+        favorite: true,
         currentSeason: 1,
         updatedAt: "2026-08-23T12:00:00.000Z",
         episodes: Array.from({ length: 5 }, (_, index) => ({
@@ -51,6 +52,7 @@ describe("episode CSV transfer", () => {
       posterPath: "/poster.jpg",
       totalSeasons: 1,
     });
+    expect(imported[0]?.favorite).toBe(true);
   });
   it("rejects mismatched episode totals before persistence", () => {
     const csv = exportCsv([
@@ -68,6 +70,7 @@ describe("episode CSV transfer", () => {
           genres: [],
         },
         status: "watchlist",
+        favorite: false,
         currentSeason: 1,
         updatedAt: "2026-08-23T12:00:00.000Z",
         episodes: [],

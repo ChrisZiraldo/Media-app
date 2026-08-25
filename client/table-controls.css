@@ -42,6 +42,9 @@
 .quick-menu {
   position: relative;
 }
+.quick-menu[open] {
+  z-index: 100;
+}
 .filter-menu summary,
 .quick-menu summary {
   list-style: none;
@@ -86,6 +89,7 @@
   cursor: pointer;
 }
 .quick-menu > div {
+  z-index: 1000;
   right: 0;
   left: auto;
 }

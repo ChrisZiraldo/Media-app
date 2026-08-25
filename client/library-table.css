@@ -37,6 +37,16 @@
   border-radius: inherit;
   background: var(--accent);
 }
+.genre-cell {
+  width: 200px;
+  min-width: 180px;
+  max-width: 200px;
+  white-space: normal;
+}
+.genre-cell > span {
+  display: block;
+  line-height: 1.35;
+}
 .next-episode,
 .episode-date {
   display: block;

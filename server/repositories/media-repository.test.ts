@@ -46,6 +46,85 @@ describe("MediaRepository", () => {
     database.close();
   });
 
+  it("promotes a watchlist show to watching when progress begins", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "media-repo-"));
+    directories.push(directory);
+    const database = openDatabase(directory),
+      repository = new MediaRepository(database),
+      id = repository.addOrUpdate(
+        {
+          tmdbId: 1405,
+          mediaType: "tv",
+          title: "Dexter",
+          overview: null,
+          posterPath: null,
+          backdropPath: null,
+          releaseDate: null,
+          firstAirDate: "2006-10-01",
+          totalEpisodes: 2,
+          showStatus: "Ended",
+          genres: ["Crime"],
+        },
+        "watchlist",
+      );
+    repository.upsertEpisodes(id, [
+      {
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: "Dexter",
+        overview: null,
+        airDate: "2006-10-01",
+        runtimeMinutes: 50,
+        stillPath: null,
+      },
+      {
+        seasonNumber: 1,
+        episodeNumber: 2,
+        title: "Crocodile",
+        overview: null,
+        airDate: "2006-10-08",
+        runtimeMinutes: 50,
+        stillPath: null,
+      },
+    ]);
+
+    repository.setEpisodeWatched(id, 1, 1, true);
+
+    expect(repository.list({ view: "watchlist" })).toHaveLength(0);
+    expect(repository.list({ view: "continue" })[0]).toMatchObject({
+      id,
+      status: "watching",
+      watchedEpisodes: 1,
+    });
+    expect(
+      repository
+        .activity()
+        .filter((event) => event.eventType === "status_changed"),
+    ).toHaveLength(1);
+
+    repository.setEpisodeWatched(id, 1, 2, true);
+    expect(repository.list()[0]).toMatchObject({
+      status: "watched",
+      libraryView: "finished",
+      watchedEpisodes: 2,
+    });
+    repository.setEpisodeWatched(id, 1, 1, false);
+    expect(repository.list()[0]).toMatchObject({
+      status: "watching",
+      libraryView: "continue",
+      watchedEpisodes: 1,
+    });
+    repository.setEpisodeWatched(id, 1, 2, false);
+    expect(repository.list({ view: "continue" })).toHaveLength(0);
+    expect(repository.list({ view: "watchlist" })[0]).toMatchObject({
+      id,
+      status: "watchlist",
+      libraryView: "watchlist",
+      watchedEpisodes: 0,
+    });
+    database.close();
+  });
+
   it("combines canonical filters and stable server-side sorting", () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "media-repo-"));
     directories.push(directory);
@@ -122,15 +201,35 @@ describe("MediaRepository", () => {
     repository.setEpisodeWatched(id, 1, 5, true);
     repository.setEpisodeWatched(id, 1, 3, true);
     expect(repository.list()[0]?.watchedEpisodes).toBe(3);
-    expect(repository.activity()).toHaveLength(3);
+    expect(
+      repository
+        .activity()
+        .filter((event) => event.eventType !== "status_changed"),
+    ).toHaveLength(3);
     repository.setEpisodeWatched(id, 1, 3, false);
     repository.setEpisodeWatched(id, 1, 3, false);
     expect(repository.list()[0]?.watchedEpisodes).toBe(2);
-    expect(repository.activity()).toHaveLength(4);
+    expect(
+      repository
+        .activity()
+        .filter((event) => event.eventType !== "status_changed"),
+    ).toHaveLength(4);
+    expect(
+      repository
+        .activity()
+        .find((event) => event.seasonNumber === 1 && event.episodeNumber === 3),
+    ).toMatchObject({
+      episodeTitle: "Episode 3",
+      posterPath: null,
+    });
     expect(() => repository.setEpisodeWatched(id, 9, 99, true)).toThrow(
       "Episode not found",
     );
-    expect(repository.activity()).toHaveLength(4);
+    expect(
+      repository
+        .activity()
+        .filter((event) => event.eventType !== "status_changed"),
+    ).toHaveLength(4);
     database.close();
   });
 
@@ -190,17 +289,24 @@ describe("MediaRepository", () => {
     expect(
       repository.listEpisodes(id, 1).every((episode) => episode.watched),
     ).toBe(true);
-    repository.setShowWatched(id, false);
-    repository.setShowWatched(id, false);
-    expect(
-      repository.listEpisodes(id).every((episode) => !episode.watched),
-    ).toBe(true);
-    expect(repository.activity()).toHaveLength(4);
+    expect(repository.list()[0]?.currentSeason).toBe(2);
     expect(repository.upcoming()[0]).toMatchObject({
       title: "Episodes",
       seasonNumber: 2,
       episodeNumber: 1,
     });
+    repository.setShowWatched(id, false);
+    repository.setShowWatched(id, false);
+    expect(
+      repository.listEpisodes(id).every((episode) => !episode.watched),
+    ).toBe(true);
+    expect(repository.list()[0]?.currentSeason).toBe(1);
+    expect(
+      repository
+        .activity()
+        .filter((event) => event.eventType !== "status_changed"),
+    ).toHaveLength(4);
+    expect(repository.upcoming()).toHaveLength(0);
     database.close();
   });
 
@@ -369,7 +475,7 @@ describe("MediaRepository", () => {
       "Watchlist titles cannot have progress",
     );
     expect(repository.list()[0]).toMatchObject({
-      status: "watching",
+      status: "watched",
       watchedEpisodes: 1,
     });
     database.close();
@@ -394,10 +500,14 @@ describe("MediaRepository", () => {
         "watching",
       );
     repository.setNote(id, "Remember this episode");
+    repository.setFavorite(id, true);
     expect(repository.list()[0]).toMatchObject({
       note: "Remember this episode",
+      favorite: true,
       overview: "A useful synopsis.",
     });
+    repository.setFavorite(id, false);
+    expect(repository.list()[0]?.favorite).toBe(false);
     repository.setNote(id, null);
     expect(repository.list()[0]?.note).toBeNull();
     database.close();

@@ -51,6 +51,50 @@ const migrations: Migration[] = [
     );
   `,
   },
+  {
+    version: 2,
+    sql: `
+    UPDATE library_entries
+    SET status='watching', completed_at=NULL, updated_at=datetime('now')
+    WHERE status IN ('watchlist','watched')
+      AND EXISTS (SELECT 1 FROM tv_episodes e WHERE e.media_item_id=library_entries.media_item_id)
+      AND EXISTS (
+        SELECT 1 FROM tv_episodes e
+        LEFT JOIN watched_episodes w ON w.media_item_id=e.media_item_id AND w.season_number=e.season_number AND w.episode_number=e.episode_number
+        WHERE e.media_item_id=library_entries.media_item_id AND w.id IS NULL
+      )
+      AND (
+        status='watched' OR EXISTS (
+          SELECT 1 FROM watched_episodes w WHERE w.media_item_id=library_entries.media_item_id
+        )
+      );
+    UPDATE library_entries
+    SET status='watched', completed_at=COALESCE(completed_at,datetime('now')), updated_at=datetime('now')
+    WHERE status<>'stopped'
+      AND EXISTS (SELECT 1 FROM tv_episodes e WHERE e.media_item_id=library_entries.media_item_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM tv_episodes e
+        LEFT JOIN watched_episodes w ON w.media_item_id=e.media_item_id AND w.season_number=e.season_number AND w.episode_number=e.episode_number
+        WHERE e.media_item_id=library_entries.media_item_id AND w.id IS NULL
+      );
+  `,
+  },
+  {
+    version: 3,
+    sql: `
+    UPDATE library_entries
+    SET status='watchlist', started_at=NULL, completed_at=NULL, updated_at=datetime('now')
+    WHERE status IN ('watching','watched')
+      AND EXISTS (SELECT 1 FROM tv_episodes e WHERE e.media_item_id=library_entries.media_item_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM watched_episodes w WHERE w.media_item_id=library_entries.media_item_id
+      );
+  `,
+  },
+  {
+    version: 4,
+    sql: `ALTER TABLE library_entries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0 CHECK (favorite IN (0,1));`,
+  },
 ];
 
 export function runMigrations(database: Database.Database): void {

@@ -1,10 +1,13 @@
 import type {
   CatalogMedia,
+  CatalogEpisodeDetail,
   CatalogSearchPage,
+  PersonDetail,
 } from "../../shared/catalog-types";
 import type { LibraryStatus } from "../../shared/media-schema";
 import type {
   ActivityItem,
+  CatalogDetail,
   LibraryItem,
   ShowDetail,
   UpcomingEpisode,
@@ -45,6 +48,24 @@ export const api = {
       `/api/v1/search?query=${encodeURIComponent(query)}&type=${type}&page=1`,
     );
   },
+  catalogDetail(
+    tmdbId: number,
+    mediaType: "movie" | "tv",
+  ): Promise<CatalogDetail> {
+    return request(`/api/v1/catalog/${mediaType}/${tmdbId}`);
+  },
+  person(tmdbPersonId: number): Promise<PersonDetail> {
+    return request(`/api/v1/people/${tmdbPersonId}`);
+  },
+  catalogEpisode(
+    tmdbId: number,
+    season: number,
+    episode: number,
+  ): Promise<CatalogEpisodeDetail> {
+    return request(
+      `/api/v1/catalog/tv/${tmdbId}/seasons/${season}/episodes/${episode}`,
+    );
+  },
   add(item: CatalogMedia, status: LibraryStatus): Promise<{ id: string }> {
     return request("/api/v1/library", {
       method: "POST",
@@ -65,6 +86,12 @@ export const api = {
     return request(`/api/v1/library/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ note }),
+    });
+  },
+  favorite(id: string, favorite: boolean): Promise<void> {
+    return request(`/api/v1/library/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ favorite }),
     });
   },
   start(id: string): Promise<unknown> {
@@ -133,5 +160,11 @@ export const api = {
     });
     if (!response.ok) throw new Error("Import failed");
     return response.json() as Promise<{ imported: number }>;
+  },
+  deleteAllData(): Promise<void> {
+    return request("/api/v1/admin/data", {
+      method: "DELETE",
+      body: JSON.stringify({ confirmation: "DELETE ALL DATA" }),
+    });
   },
 };

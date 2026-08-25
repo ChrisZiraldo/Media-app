@@ -13,5 +13,10 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Local import and validation artifacts
+imports/
+.artifact-validation/
+/scripts/convert-tvtime-export.mjs
+
 # Local editor state
 .vs/

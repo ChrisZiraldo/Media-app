@@ -147,6 +147,9 @@ describe("HTTP application", () => {
         page: 1,
         totalPages: 1,
       })),
+      catalogDetail = vi.fn(async () => ({
+        item: { title: "Catalog detail" },
+      })),
       listLibrary = vi.fn(() => []),
       detail = vi.fn(() => ({ id, title: "Detail" })),
       listEpisodes = vi.fn(() => [{ episodeNumber: 1 }]),
@@ -156,8 +159,10 @@ describe("HTTP application", () => {
       upcoming = vi.fn(() => [{ mediaId: id }]),
       exportLibraryCsv = vi.fn(() => "record_type,title\nshow,Example"),
       importLibraryCsv = vi.fn(() => 1),
+      deleteAllData = vi.fn(),
       service = {
         searchCatalog,
+        catalogDetail,
         listLibrary,
         detail,
         listEpisodes,
@@ -167,11 +172,13 @@ describe("HTTP application", () => {
         upcoming,
         exportLibraryCsv,
         importLibraryCsv,
+        deleteAllData,
       } as unknown as MediaService,
       app = createApp({ service });
 
     const requests = [
       ["GET", "/api/v1/search?query=dexter&type=tv&page=2", 200],
+      ["GET", "/api/v1/catalog/tv/1405", 200],
       ["GET", "/api/v1/library?libraryView=shows", 200],
       ["GET", "/api/v1/library/views/caught-up", 200],
       ["GET", `/api/v1/library/${id}`, 200],
@@ -197,6 +204,13 @@ describe("HTTP application", () => {
     expect(listEpisodes).toHaveBeenCalledWith(id, 1);
     expect(watchProviders).toHaveBeenCalledWith(id, "CA");
     expect(importLibraryCsv).toHaveBeenCalledOnce();
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/admin/data",
+      payload: { confirmation: "DELETE ALL DATA" },
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect(deleteAllData).toHaveBeenCalledOnce();
     await app.close();
   });
 
@@ -206,6 +220,7 @@ describe("HTTP application", () => {
         addFromCatalog: vi.fn(async () => id),
         setStatus: vi.fn(),
         setNote: vi.fn(),
+        setFavorite: vi.fn(),
         startWatching: vi.fn(() => ({ episodeNumber: 1 })),
         markNext: vi.fn(() => ({ episodeNumber: 2 })),
         refreshFromCatalog: vi.fn(async () => undefined),
@@ -231,7 +246,7 @@ describe("HTTP application", () => {
       {
         method: "PATCH",
         url: `/api/v1/library/${id}`,
-        payload: { status: "watching", note: "  note  " },
+        payload: { status: "watching", note: "  note  ", favorite: true },
         expected: 204,
       },
       {
@@ -298,6 +313,7 @@ describe("HTTP application", () => {
     }
     expect(service.setStatus).toHaveBeenCalledWith(id, "watching");
     expect(service.setNote).toHaveBeenCalledWith(id, "note");
+    expect(service.setFavorite).toHaveBeenCalledWith(id, true);
     expect(service.setEpisodeWatched).toHaveBeenNthCalledWith(
       1,
       id,

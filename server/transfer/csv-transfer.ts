@@ -8,6 +8,7 @@ export const csvHeaders = [
   "media_type",
   "airing_status",
   "library_status",
+  "favorite",
   "current_season",
   "total_episodes",
   "last_updated",
@@ -39,6 +40,7 @@ export function exportCsv(shows: TransferShow[]): string {
         item.mediaType,
         item.showStatus ?? "",
         show.status,
+        show.favorite ? "true" : "false",
         show.currentSeason ?? "",
         item.totalEpisodes ?? "",
         show.updatedAt,
@@ -46,6 +48,7 @@ export function exportCsv(shows: TransferShow[]): string {
         item.networkName ?? "",
         item.posterPath ?? "",
         item.backdropPath ?? "",
+        "",
         "",
         "",
         "",
@@ -65,6 +68,7 @@ export function exportCsv(shows: TransferShow[]): string {
           "",
           item.tmdbId,
           item.mediaType,
+          "",
           "",
           "",
           "",
@@ -128,6 +132,7 @@ const showSchema = z.object({
   media_type: z.enum(["movie", "tv"]),
   airing_status: z.string(),
   library_status: z.enum(["watchlist", "watching", "stopped", "watched"]),
+  favorite: z.enum(["true", "false", ""]).default(""),
   current_season: z.string(),
   total_episodes: z.string(),
   last_updated: z.string().datetime(),
@@ -153,7 +158,7 @@ const episodeSchema = z.object({
 export function importCsv(text: string): TransferShow[] {
   const rows = parseRows(text),
     header = rows.shift()?.map((value) => value.trim().toLowerCase()) ?? [];
-  if (csvHeaders.some((name) => !header.includes(name)))
+  if (csvHeaders.filter((name) => name !== "favorite").some((name) => !header.includes(name)))
     throw new Error("Missing required CSV columns");
   const records = rows.map((values, index) => ({
     ...Object.fromEntries(
@@ -237,6 +242,7 @@ export function importCsv(text: string): TransferShow[] {
         networkName: show.network || null,
       },
       status: show.library_status,
+      favorite: show.favorite === "true",
       currentSeason: show.current_season ? Number(show.current_season) : null,
       updatedAt: show.last_updated,
       episodes,

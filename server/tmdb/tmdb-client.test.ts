@@ -141,12 +141,20 @@ describe("TMDB client", () => {
             ],
           }),
         );
-      if (value.includes("/credits"))
+      if (value.includes("/aggregate_credits"))
         return new Response(
           JSON.stringify({
             cast: [
-              { id: 2, name: "Second", order: 2 },
-              { id: 1, name: "First", character: "Lead", order: 0 },
+              { id: 2, name: "Second", order: 2, roles: [] },
+              {
+                id: 1,
+                name: "First",
+                order: 0,
+                roles: [
+                  { character: "Lead", episode_count: 8 },
+                  { character: "Double", episode_count: 1 },
+                ],
+              },
             ],
           }),
         );
@@ -172,8 +180,12 @@ describe("TMDB client", () => {
     ]);
     expect((await client.getCast(1, "tv"))[0]).toMatchObject({
       name: "First",
-      characterName: "Lead",
+      characterName: "Lead / Double",
     });
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: "/3/tv/1/aggregate_credits" }),
+      expect.anything(),
+    );
     expect(await client.getWatchProviders(1, "tv", "ca")).toMatchObject([
       { name: "Netflix", region: "CA", accessType: "subscription" },
     ]);

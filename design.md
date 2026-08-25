@@ -61,7 +61,7 @@ remain easy to scan. Avoid decorative elements that compete with the collection.
   Stopped, or Watched. Continue, Caught up, and Finished remain derived views.
 - Browse one unified personal library.
 - Browse the derived Continue, Caught up, Watchlist, Finished, and All shows
-  views, plus Diary and Upcoming activity.
+  views, plus Diary, Upcoming, and starred Favourites under User.
 - Filter and sort each library table from icon-only controls beside its column
   headings.
 - View artwork, title metadata, synopsis, release or first-air date, runtime,
@@ -100,9 +100,10 @@ Media Tracker
 |   |-- Watchlist
 |   |-- Finished
 |   `-- All shows
-|-- Activity
+|-- User
 |   |-- Diary
-|   `-- Upcoming
+|   |-- Upcoming
+|   `-- Favourites
 |-- Admin
 |   `-- Settings
 |       |-- Import CSV
@@ -123,14 +124,14 @@ adds it.
 The application shell includes an always-available circular chevron positioned
 near the top of the divider between navigation and content. The page heading is
 placed below its vertical footprint so the two never overlap. It points left to collapse the
-Library, Activity, and Admin rail and right to restore it. When collapsed, the
+Library, User, and Admin rail and right to restore it. When collapsed, the
 content area uses the released horizontal space. The control exposes its state
 and purpose to assistive technology.
 
 At phone widths (720 px and below), navigation becomes an off-canvas drawer that
 starts closed. It overlays rather than compresses the content, is no wider than
 82% of the viewport, closes when the backdrop or a destination is selected, and
-retains the Library, Activity, and Admin group labels. Tables may scroll
+retains the Library, User, and Admin group labels. Tables may scroll
 horizontally where their essential columns cannot fit without loss of meaning.
 
 ## 6. Core journeys
@@ -207,7 +208,7 @@ Required elements:
 
 - `MEDIA/TRACKER` as the persistent product identity.
 - A global search field in the top bar.
-- A persistent navigation rail grouped under Library, Activity, and Admin.
+- A persistent navigation rail grouped under Library, User, and Admin.
 - A contextual series panel on wide library screens; it may collapse on smaller
   screens.
 - A restrained content width on desktop and edge-conscious padding on mobile.
@@ -373,11 +374,11 @@ Continue and Caught up menus also offer **Stop watching**. Activating it
 removes the show from the active watching view, retains it in All shows with a
 Stopped badge, and makes it available through the Stopped Library View filter.
 
-Under Activity, **Upcoming** lists announced future episodes across every series
+Under User, **Upcoming** lists announced future episodes across every series
 the user is currently Watching. Series without an announced episode date remain
 visible with an explicit unavailable-date state.
 
-An **Admin** sidebar group appears below Activity. Its **Settings** view provides
+An **Admin** sidebar group appears below User. Its **Settings** view provides
 CSV import and export actions for complete library data. The file contains one
 metadata record per show and one state record per known episode. Each episode
 record carries its own watched value, so non-sequential histories such as

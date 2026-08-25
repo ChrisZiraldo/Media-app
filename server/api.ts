@@ -20,6 +20,18 @@ const searchQuerySchema = z.object({
   type: z.enum(["movie", "tv", "all"]).default("all"),
   page: z.coerce.number().int().positive().default(1),
 });
+const catalogDetailParamsSchema = z.object({
+  type: z.enum(["movie", "tv"]),
+  tmdbId: z.coerce.number().int().positive(),
+});
+const personParamsSchema = z.object({
+  tmdbPersonId: z.coerce.number().int().positive(),
+});
+const catalogEpisodeParamsSchema = z.object({
+  tmdbId: z.coerce.number().int().positive(),
+  season: z.coerce.number().int().min(0),
+  episode: z.coerce.number().int().min(1),
+});
 const libraryQuerySchema = z.object({
   libraryView: libraryViewSchema.optional(),
   status: libraryStatusSchema.optional(),
@@ -43,8 +55,17 @@ const addLibrarySchema = z.object({
   status: libraryStatusSchema,
 });
 const updateLibrarySchema = z
-  .object({ status: libraryStatusSchema.optional(), note: noteSchema })
-  .refine((value) => value.status !== undefined || value.note !== undefined);
+  .object({
+    status: libraryStatusSchema.optional(),
+    note: noteSchema,
+    favorite: z.boolean().optional(),
+  })
+  .refine(
+    (value) =>
+      value.status !== undefined ||
+      value.note !== undefined ||
+      value.favorite !== undefined,
+  );
 const episodeParamsSchema = z.object({
   id: z.string().uuid(),
   season: z.coerce.number().int().min(0),
@@ -55,9 +76,12 @@ const idParamsSchema = episodeParamsSchema.pick({ id: true });
 const episodeQuerySchema = z.object({
   season: z.coerce.number().int().min(0).optional(),
 });
+const deleteAllDataSchema = z.object({
+  confirmation: z.literal("DELETE ALL DATA"),
+});
 
 export function createApp(options: AppOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: false, bodyLimit: 5 * 1024 * 1024 });
+  const app = Fastify({ logger: false, bodyLimit: 12 * 1024 * 1024 });
   app.addContentTypeParser(
     ["text/csv", "application/csv"],
     { parseAs: "string" },
@@ -69,6 +93,40 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
     if (!options.service) return { items: [], page: 1, totalPages: 0 };
     return options.service.searchCatalog(input.query, input.type, input.page);
   });
+  app.get("/api/v1/catalog/:type/:tmdbId", async (request, reply) => {
+    if (!options.service)
+      return reply.status(503).send({
+        error: {
+          code: "REQUEST_ERROR",
+          message: "Library service is not configured",
+        },
+      });
+    const input = catalogDetailParamsSchema.parse(request.params);
+    return options.service.catalogDetail(input.tmdbId, input.type);
+  });
+  app.get("/api/v1/people/:tmdbPersonId", async (request, reply) => {
+    if (!options.service)
+      return reply.status(503).send({
+        error: { code: "REQUEST_ERROR", message: "Library service is not configured" },
+      });
+    const input = personParamsSchema.parse(request.params);
+    return options.service.personDetail(input.tmdbPersonId);
+  });
+  app.get(
+    "/api/v1/catalog/tv/:tmdbId/seasons/:season/episodes/:episode",
+    async (request, reply) => {
+      if (!options.service)
+        return reply.status(503).send({
+          error: { code: "REQUEST_ERROR", message: "Library service is not configured" },
+        });
+      const input = catalogEpisodeParamsSchema.parse(request.params);
+      return options.service.episodeDetail(
+        input.tmdbId,
+        input.season,
+        input.episode,
+      );
+    },
+  );
   app.get("/api/v1/library", async (request) => {
     const input = libraryQuerySchema.parse(request.query);
     return {
@@ -139,6 +197,8 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
     if (input.status !== undefined) options.service.setStatus(id, input.status);
     if (input.note !== undefined)
       options.service.setNote(id, input.note?.trim() || null);
+    if (input.favorite !== undefined)
+      options.service.setFavorite(id, input.favorite);
     return reply.status(204).send();
   });
   app.post("/api/v1/library/:id/actions/start", async (request, reply) => {
@@ -393,6 +453,18 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
         error: { code: "REQUEST_ERROR", message: "CSV body required" },
       });
     return { imported: options.service.importLibraryCsv(request.body) };
+  });
+  app.delete("/api/v1/admin/data", async (request, reply) => {
+    if (!options.service)
+      return reply.status(503).send({
+        error: {
+          code: "REQUEST_ERROR",
+          message: "Library service is not configured",
+        },
+      });
+    deleteAllDataSchema.parse(request.body);
+    options.service.deleteAllData();
+    return reply.status(204).send();
   });
   if (options.staticRoot) {
     void app.register(fastifyStatic, { root: options.staticRoot });

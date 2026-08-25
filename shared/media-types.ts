@@ -1,5 +1,10 @@
 import type { LibraryStatus, MediaType } from "./media-schema.js";
-import type { CastMember, WatchProvider } from "./catalog-types.js";
+import type {
+  CastMember,
+  CatalogEpisode,
+  CatalogMedia,
+  WatchProvider,
+} from "./catalog-types.js";
 
 export interface LibraryItem {
   id: string;
@@ -14,6 +19,7 @@ export interface LibraryItem {
   runtimeMinutes: number | null;
   showStatus: string | null;
   status: LibraryStatus;
+  favorite: boolean;
   note: string | null;
   watchedEpisodes: number;
   totalEpisodes: number | null;
@@ -45,6 +51,8 @@ export interface ActivityItem {
   eventType: "episode_watched" | "episode_unwatched" | "status_changed";
   seasonNumber: number | null;
   episodeNumber: number | null;
+  episodeTitle: string | null;
+  posterPath: string | null;
   occurredAt: string;
 }
 
@@ -61,6 +69,14 @@ export interface UpcomingEpisode {
 export interface ShowDetail {
   item: LibraryItem;
   episodes: EpisodeState[];
+  cast: CastMember[];
+  providers: WatchProvider[];
+  providerAttribution: "JustWatch";
+}
+
+export interface CatalogDetail {
+  item: CatalogMedia;
+  episodes: CatalogEpisode[];
   cast: CastMember[];
   providers: WatchProvider[];
   providerAttribution: "JustWatch";

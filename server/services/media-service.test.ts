@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../database.js";
 import { MediaRepository } from "../repositories/media-repository.js";
 import type { TmdbClient } from "../tmdb/tmdb-client.js";
+import { exportCsv } from "../transfer/csv-transfer.js";
 import { MediaService } from "./media-service.js";
 
 const directories: string[] = [];
@@ -41,6 +42,106 @@ const details = {
 };
 
 describe("MediaService catalog additions", () => {
+  it("assigns canonical statuses when importing into an empty library", () => {
+    const { database, repository } = setup(),
+      service = new MediaService(repository),
+      episodes = [1, 2].map((episodeNumber) => ({
+        seasonNumber: 1,
+        episodeNumber,
+        title: `Episode ${episodeNumber}`,
+        overview: null,
+        airDate: `2006-10-0${episodeNumber}`,
+        runtimeMinutes: 55,
+        stillPath: null,
+        watched: episodeNumber === 1,
+        watchedAt:
+          episodeNumber === 1 ? "2026-08-24T12:00:00.000Z" : null,
+      }));
+
+    service.importLibraryCsv(
+      exportCsv([
+        {
+          item: { ...details, totalEpisodes: 2 },
+          status: "watching",
+          favorite: false,
+          currentSeason: 1,
+          updatedAt: "2026-08-24T12:00:00.000Z",
+          episodes,
+        },
+      ]),
+    );
+
+    expect(repository.list()).toEqual([
+      expect.objectContaining({ status: "watching", watchedEpisodes: 1 }),
+    ]);
+    database.close();
+  });
+  it("merges imported watched episodes and favourites without losing either source", () => {
+    const { database, repository } = setup(),
+      service = new MediaService(repository),
+      id = repository.addOrUpdate({ ...details, totalEpisodes: 2 }, "watching"),
+      episodes = [1, 2].map((episodeNumber) => ({
+        seasonNumber: 1,
+        episodeNumber,
+        title: `Episode ${episodeNumber}`,
+        overview: null,
+        airDate: `2006-10-0${episodeNumber}`,
+        runtimeMinutes: 55,
+        stillPath: null,
+      }));
+    repository.upsertEpisodes(id, episodes);
+    repository.setEpisodeWatched(id, 1, 1, true);
+    repository.setFavorite(id, true);
+
+    service.importLibraryCsv(
+      exportCsv([
+        {
+          item: { ...details, totalEpisodes: 2 },
+          status: "watching",
+          favorite: false,
+          currentSeason: 1,
+          updatedAt: "2026-08-24T12:00:00.000Z",
+          episodes: episodes.map((episode) => ({
+            ...episode,
+            watched: episode.episodeNumber === 2,
+            watchedAt:
+              episode.episodeNumber === 2
+                ? "2026-08-24T12:00:00.000Z"
+                : null,
+          })),
+        },
+      ]),
+    );
+
+    expect(service.detail(id)?.item.favorite).toBe(true);
+    expect(service.detail(id)?.item.status).toBe("watched");
+    expect(service.listEpisodes(id).map((episode) => episode.watched)).toEqual([
+      true,
+      true,
+    ]);
+    database.close();
+  });
+  it("rejects adding the same TMDB title more than once", async () => {
+    const { database, repository } = setup(),
+      tmdb = {
+        getDetails: vi.fn(async () => ({
+          ...details,
+          totalSeasons: undefined,
+        })),
+        getCast: vi.fn(async () => []),
+        getWatchProviders: vi.fn(async () => []),
+        getSeason: vi.fn(async () => []),
+      } as unknown as TmdbClient,
+      service = new MediaService(repository, tmdb);
+
+    await service.addFromCatalog(1405, "tv", "watchlist");
+    await expect(
+      service.addFromCatalog(1405, "tv", "watchlist"),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(repository.list()).toHaveLength(1);
+    database.close();
+  });
+
   it("uses the configured region for provider fetches and detail output", async () => {
     const { database, repository } = setup(),
       getWatchProviders = vi.fn(async () => [

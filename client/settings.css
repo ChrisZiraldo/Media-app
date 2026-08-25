@@ -18,6 +18,14 @@
   color: #87939a;
   font-size: 0.78rem;
 }
+.settings-grid article.danger-zone {
+  border-color: #704047;
+}
+.settings-grid .delete-data-button {
+  border-color: #884953;
+  background: #612f37;
+  color: #fff1f2;
+}
 .settings-grid button,
 .file-button {
   display: inline-grid;
@@ -37,7 +45,7 @@
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
-.settings-grid > .notice {
+.settings-grid > .settings-status {
   grid-column: 1/-1;
   margin-top: 0;
 }
@@ -45,7 +53,7 @@
   .settings-grid {
     grid-template-columns: 1fr;
   }
-  .settings-grid > .notice {
+  .settings-grid > .settings-status {
     grid-column: auto;
   }
 }

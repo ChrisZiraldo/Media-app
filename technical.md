@@ -795,3 +795,5 @@ interval such as 30 minutes.
 - The process listens only on loopback.
 - `/media/` is added without modifying existing Serve routes.
 - Local HTTP, Tailnet HTTP, and MCP checks pass after deployment.
+- Favourites filters the All shows response by the persisted `favorite` flag;
+  the show-detail star toggles that flag through the library PATCH endpoint.

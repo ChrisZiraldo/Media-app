@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import type { CatalogMedia } from "../shared/catalog-types";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import type {
+  CastMember,
+  CatalogEpisode,
+  CatalogMedia,
+  PersonDetail,
+} from "../shared/catalog-types";
 import type {
   ActivityItem,
+  CatalogDetail as CatalogDetailData,
+  EpisodeState,
   LibraryItem,
   ShowDetail as ShowDetailData,
   UpcomingEpisode,
@@ -10,7 +18,7 @@ import { api } from "./lib/api";
 
 const navigation = [
   ["Library", ["Continue", "Caught up", "Watchlist", "Finished", "All shows"]],
-  ["Activity", ["Diary", "Upcoming"]],
+  ["User", ["Diary", "Upcoming", "Favourites"]],
   ["Admin", ["Settings"]],
 ] as const;
 const viewValues: Record<string, string> = {
@@ -19,12 +27,89 @@ const viewValues: Record<string, string> = {
   Watchlist: "watchlist",
   Finished: "finished",
   "All shows": "shows",
+  Favourites: "favorites",
 };
 type SortKey = "title" | "progress" | "nextEpisode" | "updatedAt";
+
+function useHeroPosterFit() {
+  const copyRef = useRef<HTMLDivElement>(null),
+    [posterWidth, setPosterWidth] = useState(200);
+  useEffect(() => {
+    const copy = copyRef.current;
+    if (!copy) return;
+    const update = () =>
+      setPosterWidth(Math.min(200, Math.max(120, copy.offsetHeight * (2 / 3))));
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(copy);
+    return () => observer.disconnect();
+  });
+  return { copyRef, posterWidth };
+}
+
+function FittedDetailTitle({ title }: { title: string }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => {
+    const element = titleRef.current;
+    if (!element) return;
+    let lastWidth = -1;
+    const fit = () => {
+      const availableWidth = element.clientWidth;
+      if (!availableWidth || availableWidth === lastWidth) return;
+      lastWidth = availableWidth;
+      element.style.fontSize = "";
+      const naturalWidth = element.scrollWidth,
+        baseSize = Number.parseFloat(getComputedStyle(element).fontSize);
+      if (naturalWidth > availableWidth) {
+        const fittedSize = Math.max(
+          12,
+          Math.floor((baseSize * availableWidth) / naturalWidth),
+        );
+        element.style.fontSize = `${fittedSize}px`;
+      }
+    };
+    fit();
+    const observer =
+        typeof ResizeObserver === "undefined"
+          ? null
+          : new ResizeObserver(fit),
+      parent = element.parentElement;
+    if (parent) observer?.observe(parent);
+    window.addEventListener("resize", fit);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, [title]);
+  return (
+    <h1 ref={titleRef} className={title.length > 18 ? "long-title" : ""}>
+      {title}
+    </h1>
+  );
+}
+
+async function loadLibrary(view: string): Promise<LibraryItem[]> {
+  const items = await api.library(view === "favorites" ? "shows" : view);
+  return view === "favorites" ? items.filter((item) => item.favorite) : items;
+}
 
 function readShowRoute() {
   const match = window.location.pathname.match(/\/shows\/([^/]+)(\/cast)?\/?$/);
   return { id: match?.[1] ?? null, cast: Boolean(match?.[2]) };
+}
+
+function readCatalogRoute() {
+  const match = window.location.pathname.match(
+    /\/catalog\/(movie|tv)\/(\d+)(\/cast)?\/?$/,
+  );
+  return match
+    ? {
+        mediaType: match[1] as "movie" | "tv",
+        tmdbId: Number(match[2]),
+        cast: Boolean(match[3]),
+      }
+    : null;
 }
 
 function showUrl(id?: string, cast = false) {
@@ -32,8 +117,17 @@ function showUrl(id?: string, cast = false) {
   return id ? `${base}/shows/${id}${cast ? "/cast" : ""}` : `${base}/`;
 }
 
+function catalogUrl(
+  item: Pick<CatalogMedia, "mediaType" | "tmdbId">,
+  cast = false,
+) {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  return `${base}/catalog/${item.mediaType}/${item.tmdbId}${cast ? "/cast" : ""}`;
+}
+
 export function App() {
   const initialRoute = readShowRoute();
+  const initialCatalogRoute = readCatalogRoute();
   const [view, setView] = useState("Continue"),
     [menuOpen, setMenuOpen] = useState(false),
     [sidebarCollapsed, setSidebarCollapsed] = useState(false),
@@ -41,14 +135,17 @@ export function App() {
       () => window.matchMedia?.("(max-width: 720px)").matches ?? false,
     ),
     [query, setQuery] = useState(""),
-    [searchType, setSearchType] = useState<"all" | "tv" | "movie">("all");
+    [searchType, setSearchType] = useState<"all" | "tv" | "movie">("all"),
+    [searchOpen, setSearchOpen] = useState(false);
   const [items, setItems] = useState<LibraryItem[]>([]),
     [results, setResults] = useState<CatalogMedia[]>([]),
     [message, setMessage] = useState(""),
     [selectedId, setSelectedId] = useState<string | null>(initialRoute.id),
     [selectedCast, setSelectedCast] = useState(initialRoute.cast),
+    [selectedCatalog, setSelectedCatalog] = useState(initialCatalogRoute),
     [counts, setCounts] = useState<Record<string, number>>({}),
     [trackedTitles, setTrackedTitles] = useState<Record<string, string>>({}),
+    [addingTitles, setAddingTitles] = useState<Record<string, boolean>>({}),
     [libraryLoading, setLibraryLoading] = useState(true),
     [libraryError, setLibraryError] = useState(""),
     [libraryAttempt, setLibraryAttempt] = useState(0),
@@ -56,6 +153,8 @@ export function App() {
     [searchState, setSearchState] = useState<
       "idle" | "loading" | "success" | "error"
     >("idle");
+  const searchRef = useRef<HTMLDivElement>(null),
+    searchResultsRef = useRef<HTMLElement>(null);
   const viewValue = viewValues[view];
   const navigationExpanded = isMobile ? menuOpen : !sidebarCollapsed,
     navigationHidden = !navigationExpanded;
@@ -67,6 +166,7 @@ export function App() {
           ...totals,
           [item.libraryView]: (totals[item.libraryView] ?? 0) + 1,
           shows: (totals.shows ?? 0) + 1,
+          favorites: (totals.favorites ?? 0) + (item.favorite ? 1 : 0),
         }),
         {},
       ),
@@ -81,21 +181,49 @@ export function App() {
     window.history.pushState({}, "", showUrl(id, cast));
     setSelectedId(id);
     setSelectedCast(cast);
+    setSelectedCatalog(null);
+    setSearchOpen(false);
+  }
+  function openCatalog(
+    item: Pick<CatalogMedia, "mediaType" | "tmdbId">,
+    cast = false,
+  ) {
+    window.history.pushState({}, "", catalogUrl(item, cast));
+    setSelectedId(null);
+    setSelectedCast(false);
+    setSelectedCatalog({ ...item, cast });
+    setSearchOpen(false);
   }
   function leaveShow() {
     window.history.pushState({}, "", showUrl());
     setSelectedId(null);
     setSelectedCast(false);
+    setSelectedCatalog(null);
   }
   useEffect(() => {
     const restoreRoute = () => {
       const route = readShowRoute();
       setSelectedId(route.id);
       setSelectedCast(route.cast);
+      setSelectedCatalog(readCatalogRoute());
     };
     window.addEventListener("popstate", restoreRoute);
     return () => window.removeEventListener("popstate", restoreRoute);
   }, []);
+  useEffect(() => {
+    if (!searchOpen) return;
+    const dismissSearch = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (
+        searchRef.current?.contains(target) ||
+        searchResultsRef.current?.contains(target)
+      )
+        return;
+      setSearchOpen(false);
+    };
+    document.addEventListener("pointerdown", dismissSearch);
+    return () => document.removeEventListener("pointerdown", dismissSearch);
+  }, [searchOpen]);
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 720px)");
     if (!media) return;
@@ -114,8 +242,7 @@ export function App() {
   useEffect(() => {
     if (!viewValue) return;
     let active = true;
-    api
-      .library(viewValue)
+    loadLibrary(viewValue)
       .then((value) => {
         if (active) {
           setItems(value);
@@ -145,6 +272,7 @@ export function App() {
               ...totals,
               [item.libraryView]: (totals[item.libraryView] ?? 0) + 1,
               shows: (totals.shows ?? 0) + 1,
+              favorites: (totals.favorites ?? 0) + (item.favorite ? 1 : 0),
             }),
             {},
           ),
@@ -184,16 +312,30 @@ export function App() {
     };
   }, [query, searchType, searchAttempt]);
   async function add(item: CatalogMedia, status: LibraryItem["status"]) {
+    const key = `${item.mediaType}-${item.tmdbId}`;
+    if (trackedTitles[key]) {
+      setMessage(`${item.title} is already in your library.`);
+      return trackedTitles[key];
+    }
+    if (addingTitles[key]) return undefined;
+    setAddingTitles((current) => ({ ...current, [key]: true }));
     try {
-      await api.add(item, status);
+      const added = await api.add(item, status);
       setMessage(`${item.title} added`);
+      setTrackedTitles((current) => ({ ...current, [key]: added.id }));
       setResults((current) =>
         current.filter((result) => result.tmdbId !== item.tmdbId),
       );
-      if (viewValue) setItems(await api.library(viewValue));
+      if (viewValue) setItems(await loadLibrary(viewValue));
       await refreshCounts();
+      return added.id;
     } catch {
-      setMessage(`Could not add ${item.title}.`);
+      setMessage(
+        `${item.title} is already in your library or could not be added.`,
+      );
+      return undefined;
+    } finally {
+      setAddingTitles((current) => ({ ...current, [key]: false }));
     }
   }
   return (
@@ -202,7 +344,7 @@ export function App() {
         <div className="brand">
           <span>H</span> Hermes <b>Media</b>
         </div>
-        <div className="search">
+        <div className="search" ref={searchRef}>
           <label className="sr-only" htmlFor="catalog-search">
             Search shows
           </label>
@@ -212,10 +354,31 @@ export function App() {
             onChange={(event) => {
               const value = event.target.value;
               setQuery(value);
+              setSearchOpen(true);
               if (value.trim().length < 2) {
                 setResults([]);
                 setSearchState("idle");
               } else setSearchState("loading");
+            }}
+            onFocus={() => {
+              if (query.trim().length >= 2) setSearchOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key !== "Enter" ||
+                event.nativeEvent.isComposing ||
+                searchState !== "success" ||
+                results.length === 0
+              )
+                return;
+              event.preventDefault();
+              const firstResult = results[0],
+                trackedId =
+                  trackedTitles[
+                    `${firstResult.mediaType}-${firstResult.tmdbId}`
+                  ];
+              if (trackedId) openShow(trackedId);
+              else openCatalog(firstResult);
             }}
             placeholder="Search your library or TMDB"
           />
@@ -233,8 +396,12 @@ export function App() {
           </select>
         </div>
       </header>
-      {query.trim().length >= 2 && searchState !== "idle" && (
-        <section className="search-results" aria-label="TMDB search results">
+      {searchOpen && query.trim().length >= 2 && searchState !== "idle" && (
+        <section
+          className="search-results"
+          aria-label="TMDB search results"
+          ref={searchResultsRef}
+        >
           {searchState === "loading" ? (
             <p className="search-state" role="status">
               Searching TMDB…
@@ -267,7 +434,16 @@ export function App() {
                       TMDB result ·{" "}
                       {item.mediaType === "tv" ? "TV show" : "Movie"}
                     </small>
-                    <h2>{item.title}</h2>
+                    <h2>
+                      <button
+                        className="search-title"
+                        onClick={() =>
+                          trackedId ? openShow(trackedId) : openCatalog(item)
+                        }
+                      >
+                        {item.title}
+                      </button>
+                    </h2>
                     <p>
                       {item.firstAirDate?.slice(0, 4) ?? "Date unavailable"} ·{" "}
                       {item.genres.join(", ") || "Genre unavailable"}
@@ -286,24 +462,22 @@ export function App() {
                       </>
                     ) : (
                       <>
-                        <button onClick={() => void add(item, "watchlist")}>
-                          ★ Watchlist
+                        <button
+                          disabled={
+                            addingTitles[`${item.mediaType}-${item.tmdbId}`]
+                          }
+                          onClick={() => void add(item, "watchlist")}
+                        >
+                          {addingTitles[`${item.mediaType}-${item.tmdbId}`]
+                            ? "Adding…"
+                            : "★ Watchlist"}
                         </button>
-                        {item.mediaType === "tv" ? (
-                          <button
-                            className="primary"
-                            onClick={() => void add(item, "watching")}
-                          >
-                            Start watching
-                          </button>
-                        ) : (
-                          <button
-                            className="primary"
-                            onClick={() => void add(item, "watched")}
-                          >
-                            Add as watched
-                          </button>
-                        )}
+                        <button
+                          className="primary"
+                          onClick={() => openCatalog(item)}
+                        >
+                          View details
+                        </button>
                       </>
                     )}
                   </div>
@@ -331,17 +505,23 @@ export function App() {
                   className={view === link ? "active" : ""}
                   key={link}
                   onClick={() => {
+                    const libraryView = viewValues[link],
+                      reloadSelectedView = Boolean(
+                        libraryView && link === view,
+                      );
                     setView(link);
-                    if (selectedId) leaveShow();
-                    if (viewValues[link]) {
+                    if (selectedId || selectedCatalog) leaveShow();
+                    if (libraryView) {
                       setLibraryLoading(true);
                       setLibraryError("");
+                      if (reloadSelectedView)
+                        setLibraryAttempt((attempt) => attempt + 1);
                     }
                     if (isMobile) setMenuOpen(false);
                   }}
                 >
                   <span>{link}</span>
-                  {group === "Library" && (
+                  {(group === "Library" || link === "Favourites") && (
                     <b aria-hidden="true">{counts[viewValues[link]] ?? 0}</b>
                   )}
                 </button>
@@ -373,24 +553,53 @@ export function App() {
             <ShowDetail
               key={`${selectedId}-${selectedCast}`}
               id={selectedId}
+              backLabel={view}
               initialFullCast={selectedCast}
               onCast={(cast) => openShow(selectedId, cast)}
               onBack={leaveShow}
-              onLibraryChanged={refreshCounts}
+              onLibraryChanged={async () => {
+                await refreshCounts();
+                if (viewValue) setItems(await loadLibrary(viewValue));
+              }}
+            />
+          ) : selectedCatalog ? (
+            <CatalogDetail
+              key={`${selectedCatalog.mediaType}-${selectedCatalog.tmdbId}-${selectedCatalog.cast}`}
+              item={selectedCatalog}
+              initialFullCast={selectedCatalog.cast}
+              onCast={(cast) => openCatalog(selectedCatalog, cast)}
+              onBack={leaveShow}
+              onWatchlist={async (item) => {
+                const id = await add(item, "watchlist");
+                if (id) openShow(id);
+              }}
+              onEpisodeWatched={async (item, season, episode) => {
+                const id = await add(item, "watchlist");
+                if (!id) throw new Error("Could not add show");
+                await api.episode(id, season, episode, true);
+                await refreshCounts();
+                openShow(id);
+              }}
             />
           ) : (
             <>
               <header className="page-heading">
                 <div>
-                  <h1>{view}</h1>
+                  <h1>{view === "Diary" ? "Recent viewing" : view}</h1>
                   <p>
-                    {viewValue
-                      ? `${items.length} tracked ${items.length === 1 ? "show" : "shows"}`
-                      : "Activity and administration"}
+                    {view === "Diary"
+                      ? "A chronological record of explicit viewing actions."
+                      : view === "Upcoming"
+                        ? "Announced episodes for shows you are currently watching."
+                        : view === "Favourites"
+                          ? "Shows you have starred as favourites."
+                          : viewValue
+                            ? `${items.length} tracked ${items.length === 1 ? "show" : "shows"}`
+                            : "User activity and administration"}
                   </p>
                 </div>
               </header>
-              {message && (
+              {message && viewValue && (
                 <div className="notice" role="status">
                   {message}
                 </div>
@@ -420,20 +629,28 @@ export function App() {
                     view={viewValue}
                     onOpen={(id) => openShow(id)}
                     onChanged={async () => {
-                      setItems(await api.library(viewValue));
+                      setItems(await loadLibrary(viewValue));
                       await refreshCounts();
                     }}
                   />
                 ) : (
                   <Empty
-                    title="No titles here yet"
-                    copy="Search TMDB to add your first show."
+                    title={
+                      view === "Favourites"
+                        ? "No favourite shows yet"
+                        : "No titles here yet"
+                    }
+                    copy={
+                      view === "Favourites"
+                        ? "Use the star on a show’s detail page to add it here."
+                        : "Search TMDB to add your first show."
+                    }
                   />
                 )
               ) : view === "Diary" ? (
-                <Diary />
+                <Diary onOpen={openShow} />
               ) : view === "Upcoming" ? (
-                <Upcoming />
+                <Upcoming onOpen={openShow} />
               ) : (
                 <Settings onImported={refreshCounts} />
               )}
@@ -783,7 +1000,9 @@ function LibraryTable({
                   </div>
                 </td>
               )}
-              <td>{item.genre.join(", ") || "—"}</td>
+              <td className="genre-cell">
+                <span>{item.genre.join(", ") || "—"}</span>
+              </td>
               {showsProvider && (
                 <td className="mobile-hide">{item.provider ?? "—"}</td>
               )}
@@ -1011,6 +1230,7 @@ function FilterMenu({
     </details>
   );
 }
+
 function Empty({
   title,
   copy,
@@ -1028,7 +1248,7 @@ function Empty({
     </section>
   );
 }
-function Diary() {
+function Diary({ onOpen }: { onOpen: (id: string) => void }) {
   const [items, setItems] = useState<ActivityItem[] | null>(null),
     [failed, setFailed] = useState(false),
     [attempt, setAttempt] = useState(0);
@@ -1072,25 +1292,70 @@ function Diary() {
       />
     );
   return (
-    <div className="activity-list">
-      {items.map((item) => (
-        <article key={item.id}>
-          <div>
-            <small>{item.eventType.replaceAll("_", " ")}</small>
-            <strong>
-              {item.title} ·{" "}
-              {item.seasonNumber === null
-                ? "Status"
-                : `S${item.seasonNumber} E${item.episodeNumber}`}
-            </strong>
+    <div className="activity-feed">
+      {Object.entries(
+        items.reduce<Record<string, ActivityItem[]>>((groups, item) => {
+          const date = new Date(item.occurredAt),
+            today = new Date(),
+            yesterday = new Date();
+          yesterday.setDate(today.getDate() - 1);
+          const key = date.toDateString();
+          const label =
+            key === today.toDateString()
+              ? "Today"
+              : key === yesterday.toDateString()
+                ? "Yesterday"
+                : date.toLocaleDateString(undefined, {
+                    month: "long",
+                    day: "numeric",
+                  });
+          (groups[label] ??= []).push(item);
+          return groups;
+        }, {}),
+      ).map(([day, dayItems]) => (
+        <section className="activity-day" key={day}>
+          <h2>{day}</h2>
+          <div className="activity-list">
+            {dayItems.map((item) => (
+              <article key={item.id}>
+                <Poster path={item.posterPath} />
+                <div className="activity-copy">
+                  <small>{item.eventType.replaceAll("_", " ")}</small>
+                  <div className="activity-show-line">
+                    <button
+                      className="activity-title"
+                      onClick={() => onOpen(item.mediaId)}
+                    >
+                      {item.title}
+                    </button>
+                    {item.seasonNumber !== null && (
+                      <span className="activity-episode-number">
+                        · S{item.seasonNumber} E{item.episodeNumber}
+                      </span>
+                    )}
+                  </div>
+                  <span>
+                    {item.episodeTitle ??
+                      (item.eventType === "status_changed"
+                        ? "Library status updated"
+                        : "Episode progress updated")}
+                  </span>
+                </div>
+                <time>
+                  {new Date(item.occurredAt).toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </time>
+              </article>
+            ))}
           </div>
-          <time>{new Date(item.occurredAt).toLocaleString()}</time>
-        </article>
+        </section>
       ))}
     </div>
   );
 }
-function Upcoming() {
+function Upcoming({ onOpen }: { onOpen: (id: string) => void }) {
   const [items, setItems] = useState<UpcomingEpisode[] | null>(null),
     [failed, setFailed] = useState(false),
     [attempt, setAttempt] = useState(0);
@@ -1139,13 +1404,21 @@ function Upcoming() {
         <article
           key={`${item.mediaId}-${item.seasonNumber}-${item.episodeNumber}`}
         >
-          <div>
-            <small>
-              S{item.seasonNumber} E{item.episodeNumber}
-            </small>
-            <strong>
-              {item.title} · {item.episodeTitle ?? "Title unavailable"}
-            </strong>
+          <Poster path={item.posterPath} />
+          <div className="activity-copy">
+            <small>Upcoming episode</small>
+            <div className="activity-show-line">
+              <button
+                className="activity-title"
+                onClick={() => onOpen(item.mediaId)}
+              >
+                {item.title}
+              </button>
+              <span className="activity-episode-number">
+                · S{item.seasonNumber} E{item.episodeNumber}
+              </span>
+            </div>
+            <span>{item.episodeTitle ?? "Title unavailable"}</span>
           </div>
           <time>
             {new Date(`${item.airDate}T12:00:00`).toLocaleDateString()}
@@ -1156,7 +1429,11 @@ function Upcoming() {
   );
 }
 function Settings({ onImported }: { onImported: () => Promise<void> }) {
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(""),
+    [importPending, setImportPending] = useState(false),
+    [deleteDialogOpen, setDeleteDialogOpen] = useState(false),
+    [deletePending, setDeletePending] = useState(false),
+    [deleteError, setDeleteError] = useState("");
   async function download() {
     try {
       const blob = await api.exportCsv(),
@@ -1172,14 +1449,32 @@ function Settings({ onImported }: { onImported: () => Promise<void> }) {
   }
   async function upload(file: File | undefined) {
     if (!file) return;
+    setImportPending(true);
     try {
-      const result = await api.importCsv(await file.text());
+      const csv = await file.text();
+      const result = await api.importCsv(csv);
       await onImported();
       setStatus(
         `${result.imported} ${result.imported === 1 ? "show" : "shows"} imported`,
       );
     } catch {
       setStatus("Import failed. Check the CSV and try again.");
+    } finally {
+      setImportPending(false);
+    }
+  }
+  async function deleteAllData() {
+    setDeletePending(true);
+    setDeleteError("");
+    try {
+      await api.deleteAllData();
+      await onImported();
+      setDeleteDialogOpen(false);
+      setStatus("All library data deleted");
+    } catch {
+      setDeleteError("Couldn’t delete the data. Try again.");
+    } finally {
+      setDeletePending(false);
     }
   }
   return (
@@ -1190,10 +1485,11 @@ function Settings({ onImported }: { onImported: () => Promise<void> }) {
           Restore show metadata and every episode&apos;s explicit watched state.
         </p>
         <label className="file-button">
-          Choose CSV
+          {importPending ? "Importing…" : "Choose CSV"}
           <input
             type="file"
             accept=".csv,text/csv"
+            disabled={importPending}
             onChange={(event) => void upload(event.target.files?.[0])}
           />
         </label>
@@ -1205,28 +1501,353 @@ function Settings({ onImported }: { onImported: () => Promise<void> }) {
         </p>
         <button onClick={() => void download()}>Export CSV</button>
       </article>
+      <article className="danger-zone">
+        <h2>Delete all data</h2>
+        <p>
+          Permanently remove every show, episode history, favourite, note, and
+          activity entry from this app.
+        </p>
+        <button
+          className="delete-data-button"
+          onClick={() => {
+            setDeleteError("");
+            setDeleteDialogOpen(true);
+          }}
+        >
+          Delete all data
+        </button>
+      </article>
       {status && (
-        <div className="notice" role="status">
+        <p className="settings-status" role="status">
           {status}
-        </div>
+        </p>
+      )}
+      {deleteDialogOpen && (
+        <ConfirmDialog
+          title="Delete all data?"
+          description="This permanently deletes every show, watched episode, favourite, note, and activity entry. This cannot be undone."
+          confirmLabel="Delete all data"
+          pendingLabel="Deleting…"
+          pending={deletePending}
+          error={deleteError}
+          onCancel={() => {
+            if (!deletePending) setDeleteDialogOpen(false);
+          }}
+          onConfirm={() => void deleteAllData()}
+        />
       )}
     </div>
   );
 }
+function CatalogDetail({
+  item,
+  initialFullCast,
+  onCast,
+  onBack,
+  onWatchlist,
+  onEpisodeWatched,
+}: {
+  item: Pick<CatalogMedia, "mediaType" | "tmdbId">;
+  initialFullCast: boolean;
+  onCast: (cast: boolean) => void;
+  onBack: () => void;
+  onWatchlist: (item: CatalogMedia) => Promise<void>;
+  onEpisodeWatched: (
+    item: CatalogMedia,
+    season: number,
+    episode: number,
+  ) => Promise<void>;
+}) {
+  const { copyRef, posterWidth } = useHeroPosterFit(),
+    [detail, setDetail] = useState<CatalogDetailData | null>(null),
+    [failed, setFailed] = useState(false),
+    [pending, setPending] = useState(false),
+    [fullCast, setFullCast] = useState(initialFullCast),
+    [selectedPerson, setSelectedPerson] = useState<CastMember | null>(null),
+    [selectedEpisode, setSelectedEpisode] = useState<CatalogEpisode | null>(null),
+    [episodePending, setEpisodePending] = useState<string | null>(null),
+    [episodeError, setEpisodeError] = useState(""),
+    [season, setSeason] = useState(1);
+  useEffect(() => {
+    let active = true;
+    void api
+      .catalogDetail(item.tmdbId, item.mediaType)
+      .then((value) => {
+        if (active) {
+          setDetail(value);
+          setSeason(value.episodes[0]?.seasonNumber ?? 1);
+        }
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [item.mediaType, item.tmdbId]);
+  if (failed)
+    return (
+      <Empty
+        title="Details unavailable"
+        copy="Couldn’t load this TMDB title. Return to search and try again."
+        action={{ label: "Back to library", onClick: onBack }}
+      />
+    );
+  if (!detail)
+    return <Empty title="Loading details…" copy="Fetching TMDB information." />;
+  const seasons = [
+      ...new Set(detail.episodes.map((episode) => episode.seasonNumber)),
+    ],
+    episodes = detail.episodes.filter(
+      (episode) => episode.seasonNumber === season,
+    ),
+    primaryProvider =
+      detail.providers.find(
+        (provider) => provider.accessType === "subscription",
+      )?.name ?? detail.providers[0]?.name,
+    year = (detail.item.firstAirDate ?? detail.item.releaseDate)?.slice(0, 4),
+    region = detail.providers[0]?.region ?? "CA";
+  if (selectedPerson)
+    return (
+      <PersonDetailPage
+        person={selectedPerson}
+        onBack={() => setSelectedPerson(null)}
+      />
+    );
+  if (selectedEpisode)
+    return (
+      <EpisodeDetailPage
+        showTitle={detail.item.title}
+        tmdbId={detail.item.tmdbId}
+        episode={selectedEpisode}
+        onBack={() => setSelectedEpisode(null)}
+      />
+    );
+  if (fullCast)
+    return (
+      <FullCastPage
+        title={detail.item.title}
+        cast={detail.cast}
+        onPerson={setSelectedPerson}
+        onBack={() => {
+          setFullCast(false);
+          onCast(false);
+        }}
+      />
+    );
+  return (
+    <section className="show-detail catalog-detail">
+      <button className="back" onClick={onBack}>
+        ← Back to library
+      </button>
+      <header
+        className="detail-hero"
+        style={
+          {
+            "--detail-backdrop": detail.item.backdropPath
+              ? `url(https://image.tmdb.org/t/p/original${detail.item.backdropPath})`
+              : "linear-gradient(135deg, #24343d 0%, #111a20 48%, #090e12 100%)",
+          } as CSSProperties
+        }
+      >
+        <div
+          className="detail-hero-content"
+          style={
+            { "--detail-poster-width": `${posterWidth}px` } as CSSProperties
+          }
+        >
+          <DetailPoster
+            title={detail.item.title}
+            path={detail.item.posterPath}
+          />
+          <div className="detail-hero-copy" ref={copyRef}>
+            <small className="eyebrow">
+              {detail.item.mediaType === "movie"
+                ? "Movie detail"
+                : "Show detail"}
+            </small>
+            <FittedDetailTitle title={detail.item.title} />
+            <div className="detail-meta">
+              {year && <span>{year}</span>}
+              {detail.item.genres.map((genre) => (
+                <span key={genre}>{genre}</span>
+              ))}
+              {primaryProvider && <span>{primaryProvider}</span>}
+            </div>
+            <p className="synopsis">
+              {detail.item.overview ?? "No synopsis available."}
+            </p>
+            <button
+              disabled={pending}
+              onClick={() => {
+                setPending(true);
+                void onWatchlist(detail.item).finally(() => setPending(false));
+              }}
+            >
+              {pending ? "Adding…" : "★ Watchlist"}
+            </button>
+          </div>
+        </div>
+      </header>
+      <div className="detail-grid">
+        <section>
+          <div className="detail-heading">
+            <h2>Cast</h2>
+            <button
+              onClick={() => {
+                setFullCast(true);
+                onCast(true);
+              }}
+            >
+              View full cast
+            </button>
+          </div>
+          <div className="cast-row">
+            {detail.cast.slice(0, 5).map((person) => (
+              <article key={`${person.tmdbPersonId}-${person.characterName}`}>
+                <div className="avatar">
+                  <PersonAvatar name={person.name} path={person.profilePath} />
+                </div>
+                <button
+                  className="detail-text-link"
+                  onClick={() => setSelectedPerson(person)}
+                >
+                  {person.name}
+                </button>
+                <span>{person.characterName ?? "Role unavailable"}</span>
+              </article>
+            ))}
+          </div>
+          {detail.item.mediaType === "tv" && (
+            <>
+              <div className="detail-heading">
+                <h2>Episodes</h2>
+                <select
+                  aria-label="Season"
+                  value={season}
+                  onChange={(event) => setSeason(Number(event.target.value))}
+                >
+                  {seasons.map((value) => (
+                    <option key={value} value={value}>
+                      Season {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="episode-list catalog-episodes">
+                {episodes.map((episode) => (
+                  <article key={episode.episodeNumber}>
+                    <span>
+                      S{episode.seasonNumber} E{episode.episodeNumber}
+                    </span>
+                    <div>
+                      <button
+                        className="detail-text-link"
+                        onClick={() => setSelectedEpisode(episode)}
+                      >
+                        {episode.title ?? "Title unavailable"}
+                      </button>
+                      <small>
+                        {episode.airDate
+                          ? new Date(
+                              `${episode.airDate}T12:00:00`,
+                            ).toLocaleDateString()
+                          : "Air date unavailable"}
+                      </small>
+                    </div>
+                    <input
+                      type="checkbox"
+                      aria-label={`Mark S${episode.seasonNumber} E${episode.episodeNumber} watched`}
+                      disabled={
+                        episodePending ===
+                        `${episode.seasonNumber}-${episode.episodeNumber}`
+                      }
+                      onChange={() => {
+                        const key = `${episode.seasonNumber}-${episode.episodeNumber}`;
+                        setEpisodePending(key);
+                        setEpisodeError("");
+                        void onEpisodeWatched(
+                          detail.item,
+                          episode.seasonNumber,
+                          episode.episodeNumber,
+                        )
+                          .catch(() =>
+                            setEpisodeError(
+                              "Couldn’t mark this episode watched. Try again.",
+                            ),
+                          )
+                          .finally(() => setEpisodePending(null));
+                      }}
+                    />
+                  </article>
+                ))}
+              </div>
+              {episodeError && (
+                <p className="row-error" role="alert">
+                  {episodeError}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+        <aside>
+          <section className="side-card watch-card">
+            <small className="eyebrow">
+              {region === "CA" ? "Canada" : region}
+            </small>
+            <h2>Where to watch</h2>
+            {detail.providers.length ? (
+              detail.providers.map((provider) => (
+                <div
+                  className="provider-row"
+                  key={`${provider.tmdbProviderId}-${provider.accessType}`}
+                >
+                  {provider.logoPath ? (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w92${provider.logoPath}`}
+                      alt=""
+                    />
+                  ) : (
+                    <span className="provider-mark" aria-hidden="true">
+                      {provider.name.slice(0, 2)}
+                    </span>
+                  )}
+                  <div>
+                    <strong>{provider.name}</strong>
+                    <span>{provider.accessType}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p>Availability unavailable</p>
+            )}
+            <p className="provider-note">
+              Availability can change. Streaming data provided by{" "}
+              {detail.providerAttribution}.
+            </p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
 function ShowDetail({
   id,
+  backLabel,
   initialFullCast,
   onCast,
   onBack,
   onLibraryChanged,
 }: {
   id: string;
+  backLabel: string;
   initialFullCast: boolean;
   onCast: (cast: boolean) => void;
   onBack: () => void;
   onLibraryChanged: () => Promise<void>;
 }) {
-  const [detail, setDetail] = useState<ShowDetailData | null>(null),
+  const { copyRef, posterWidth } = useHeroPosterFit(),
+    [detail, setDetail] = useState<ShowDetailData | null>(null),
     [loadError, setLoadError] = useState(false),
     [loadAttempt, setLoadAttempt] = useState(0),
     [season, setSeason] = useState(1),
@@ -1234,15 +1855,19 @@ function ShowDetail({
     [note, setNote] = useState(""),
     [saveState, setSaveState] = useState(""),
     [notePending, setNotePending] = useState(false),
-    [refreshPending, setRefreshPending] = useState(false),
-    [statusPending, setStatusPending] = useState(false),
     [seasonPending, setSeasonPending] = useState(false),
     [seasonError, setSeasonError] = useState(""),
     [episodePending, setEpisodePending] = useState<string | null>(null),
     [episodeErrors, setEpisodeErrors] = useState<Record<string, string>>({}),
     [showConfirmation, setShowConfirmation] = useState(false),
     [showPending, setShowPending] = useState(false),
-    [showError, setShowError] = useState("");
+    [showError, setShowError] = useState(""),
+    [nextPending, setNextPending] = useState(false),
+    [nextError, setNextError] = useState(""),
+    [favoritePending, setFavoritePending] = useState(false),
+    [favoriteError, setFavoriteError] = useState("");
+  const [selectedPerson, setSelectedPerson] = useState<CastMember | null>(null),
+    [selectedEpisode, setSelectedEpisode] = useState<EpisodeState | null>(null);
   const refresh = () => api.detail(id).then(setDetail);
   useEffect(() => {
     let active = true;
@@ -1292,7 +1917,54 @@ function ShowDetail({
       episodes.length > 0 && episodes.every((episode) => episode.watched),
     showComplete =
       detail.episodes.length > 0 &&
-      detail.episodes.every((episode) => episode.watched);
+      detail.episodes.every((episode) => episode.watched),
+    progressPercent = detail.item.totalEpisodes
+      ? Math.round(
+          (detail.item.watchedEpisodes / detail.item.totalEpisodes) * 100,
+        )
+      : 0,
+    primaryProvider =
+      detail.providers.find(
+        (provider) => provider.accessType === "subscription",
+      )?.name ??
+      detail.item.provider ??
+      detail.providers[0]?.name,
+    providerRegion = detail.providers[0]?.region ?? "CA";
+  const effectiveStatus =
+      detail.item.status === "stopped"
+        ? "stopped"
+        : showComplete
+          ? "watched"
+          : detail.item.watchedEpisodes === 0
+            ? "watchlist"
+            : detail.item.status === "watched" ||
+                (detail.item.status === "watchlist" &&
+                  detail.item.watchedEpisodes > 0)
+              ? "watching"
+              : detail.item.status,
+    nextEpisodeNumber = detail.item.nextEpisode?.match(/^S\d+\s*E\d+/i)?.[0],
+    canonicalStatus = {
+      watchlist: "★ Watchlist",
+      watching: "★ Watching",
+      stopped: "Stopped",
+      watched: "✓ Watched",
+    }[effectiveStatus];
+  if (selectedPerson)
+    return (
+      <PersonDetailPage
+        person={selectedPerson}
+        onBack={() => setSelectedPerson(null)}
+      />
+    );
+  if (selectedEpisode)
+    return (
+      <EpisodeDetailPage
+        showTitle={detail.item.title}
+        tmdbId={detail.item.tmdbId}
+        episode={selectedEpisode}
+        onBack={() => setSelectedEpisode(null)}
+      />
+    );
   async function toggleEpisode(
     seasonNumber: number,
     episodeNumber: number,
@@ -1327,6 +1999,19 @@ function ShowDetail({
       setSeasonPending(false);
     }
   }
+  async function markNextEpisode() {
+    setNextPending(true);
+    setNextError("");
+    try {
+      await api.markNext(id);
+      await refresh();
+      await onLibraryChanged();
+    } catch {
+      setNextError("Couldn’t mark the next episode watched. Try again.");
+    } finally {
+      setNextPending(false);
+    }
+  }
   async function saveNote() {
     setNotePending(true);
     setSaveState("Saving…");
@@ -1340,32 +2025,17 @@ function ShowDetail({
       setNotePending(false);
     }
   }
-  async function changeStatus(status: LibraryItem["status"]) {
-    setStatusPending(true);
-    setSaveState("Updating status…");
+  async function toggleFavorite() {
+    setFavoritePending(true);
+    setFavoriteError("");
     try {
-      await api.status(id, status);
+      await api.favorite(id, !detail!.item.favorite);
       await refresh();
       await onLibraryChanged();
-      setSaveState("Status updated");
     } catch {
-      setSaveState("Couldn’t update the status. Try again.");
+      setFavoriteError("Couldn’t update this favourite. Try again.");
     } finally {
-      setStatusPending(false);
-    }
-  }
-  async function refreshMetadata() {
-    setRefreshPending(true);
-    setSaveState("Refreshing from TMDB…");
-    try {
-      await api.refresh(id);
-      await refresh();
-      await onLibraryChanged();
-      setSaveState("Show information refreshed");
-    } catch {
-      setSaveState("Couldn’t refresh show information. Try again.");
-    } finally {
-      setRefreshPending(false);
+      setFavoritePending(false);
     }
   }
   async function toggleShow() {
@@ -1384,69 +2054,121 @@ function ShowDetail({
   }
   if (fullCast)
     return (
-      <section className="full-cast">
-        <button
-          className="back"
-          onClick={() => {
-            setFullCast(false);
-            onCast(false);
-          }}
-        >
-          ← Back to {detail.item.title}
-        </button>
-        <header>
-          <h1>Full cast</h1>
-          <p>
-            {detail.item.title} · {detail.cast.length} credited performers
-          </p>
-        </header>
-        <div className="cast-grid">
-          {detail.cast.map((person) => (
-            <article key={`${person.tmdbPersonId}-${person.characterName}`}>
-              <div className="avatar">
-                <PersonAvatar name={person.name} path={person.profilePath} />
-              </div>
-              <strong>{person.name}</strong>
-              <span>{person.characterName ?? "Role unavailable"}</span>
-            </article>
-          ))}
-        </div>
-      </section>
+      <FullCastPage
+        title={detail.item.title}
+        cast={detail.cast}
+        onPerson={setSelectedPerson}
+        onBack={() => {
+          setFullCast(false);
+          onCast(false);
+        }}
+      />
     );
   return (
     <section className="show-detail">
       <button className="back" onClick={onBack}>
-        ← Back to {detail.item.title}
+        ← Back to {backLabel}
       </button>
-      <header>
-        <Poster path={detail.item.posterPath} />
-        <div>
-          <small>
-            {detail.item.mediaType === "movie" ? "Movie detail" : "Show detail"}
-          </small>
-          <h1>{detail.item.title}</h1>
-          <p>
-            {detail.item.genre.join(" · ")}
-            {detail.item.mediaType === "movie" && detail.item.runtimeMinutes
-              ? ` · ${detail.item.runtimeMinutes} minutes`
-              : ""}
-          </p>
-          <p className="synopsis">
-            {detail.item.overview ?? "No synopsis available."}
-          </p>
-          {detail.item.mediaType === "tv" && (
-            <button onClick={() => setShowConfirmation(true)}>
-              {showComplete
-                ? "Mark entire show as unwatched"
-                : "Mark entire show as watched"}
-            </button>
-          )}
+      <header
+        className="detail-hero"
+        style={
+          {
+            "--detail-backdrop": detail.item.backdropPath
+              ? `url(https://image.tmdb.org/t/p/original${detail.item.backdropPath})`
+              : "linear-gradient(135deg, #24343d 0%, #111a20 48%, #090e12 100%)",
+          } as CSSProperties
+        }
+      >
+        <button
+          className={`favorite-toggle ${detail.item.favorite ? "selected" : ""}`}
+          aria-label={
+            detail.item.favorite
+              ? `Remove ${detail.item.title} from favourites`
+              : `Add ${detail.item.title} to favourites`
+          }
+          aria-pressed={detail.item.favorite}
+          disabled={favoritePending}
+          onClick={() => void toggleFavorite()}
+        >
+          {detail.item.favorite ? "★" : "☆"}
+        </button>
+        <div
+          className="detail-hero-content"
+          style={
+            { "--detail-poster-width": `${posterWidth}px` } as CSSProperties
+          }
+        >
+          <DetailPoster
+            title={detail.item.title}
+            path={detail.item.posterPath}
+          />
+          <div className="detail-hero-copy" ref={copyRef}>
+            <small className="eyebrow">
+              {detail.item.mediaType === "movie"
+                ? "Movie detail"
+                : "Show detail"}
+            </small>
+            <FittedDetailTitle title={detail.item.title} />
+            <div className="detail-meta" aria-label="Show facts">
+              {detail.item.year && <span>{detail.item.year}</span>}
+              {detail.item.genre.map((genre) => (
+                <span key={genre}>{genre}</span>
+              ))}
+              {primaryProvider && <span>{primaryProvider}</span>}
+              {detail.item.mediaType === "movie" &&
+                detail.item.runtimeMinutes && (
+                  <span>{detail.item.runtimeMinutes} minutes</span>
+                )}
+            </div>
+            <p className="synopsis">
+              {detail.item.overview ?? "No synopsis available."}
+            </p>
+            {detail.item.mediaType === "tv" && (
+              <>
+                <div className="hero-actions">
+                  <button
+                    className="primary-action"
+                    disabled={!nextEpisodeNumber || nextPending}
+                    onClick={() => void markNextEpisode()}
+                  >
+                    {nextPending
+                      ? "Updating…"
+                      : nextEpisodeNumber
+                        ? `Mark ${nextEpisodeNumber} watched`
+                        : "All available episodes watched"}
+                  </button>
+                  <button onClick={() => setShowConfirmation(true)}>
+                    {showComplete
+                      ? "Mark entire show as unwatched"
+                      : "Mark entire show as watched"}
+                  </button>
+                  <span
+                    className="canonical-status"
+                    aria-label={`Canonical status: ${canonicalStatus.replace(/^[★✓]\s*/, "")}`}
+                  >
+                    {canonicalStatus}
+                  </span>
+                </div>
+                {nextError && (
+                  <p className="hero-action-error" role="alert">
+                    {nextError}
+                  </p>
+                )}
+              </>
+            )}
+            {favoriteError && (
+              <p className="hero-action-error" role="alert">
+                {favoriteError}
+              </p>
+            )}
+          </div>
         </div>
       </header>
       <div className="detail-grid">
         <section>
           <CastPreview
             detail={detail}
+            onPerson={setSelectedPerson}
             onFull={() => {
               setFullCast(true);
               onCast(true);
@@ -1492,7 +2214,13 @@ function ShowDetail({
                       <span>
                         S{episode.seasonNumber} E{episode.episodeNumber}
                       </span>
-                      <strong>{episode.title ?? "Title unavailable"}</strong>
+                      <button
+                        type="button"
+                        className="detail-text-link"
+                        onClick={() => setSelectedEpisode(episode)}
+                      >
+                        {episode.title ?? "Title unavailable"}
+                      </button>
                       <input
                         type="checkbox"
                         checked={episode.watched}
@@ -1530,73 +2258,114 @@ function ShowDetail({
         </section>
         <aside>
           {detail.item.mediaType === "tv" && (
-            <>
+            <section className="side-card progress-card">
               <h2>Your progress</h2>
-              <strong>
-                {detail.item.totalEpisodes === null
-                  ? "Total episode count unavailable"
-                  : `${detail.item.watchedEpisodes} of ${detail.item.totalEpisodes} episodes watched`}
-              </strong>
-            </>
-          )}
-          <h2>Status</h2>
-          <label className="detail-field">
-            <span className="sr-only">Library status</span>
-            <select
-              value={detail.item.status}
-              disabled={statusPending}
-              onChange={(event) =>
-                void changeStatus(event.target.value as LibraryItem["status"])
-              }
-            >
-              <option value="watchlist">Watchlist</option>
-              <option value="watching">Watching</option>
-              <option value="stopped">Stopped</option>
-              <option value="watched">Watched</option>
-            </select>
-          </label>
-          <button
-            disabled={refreshPending}
-            onClick={() => void refreshMetadata()}
-          >
-            {refreshPending ? "Refreshing…" : "Refresh from TMDB"}
-          </button>
-          <h2>Personal note</h2>
-          <label className="detail-field">
-            <span className="sr-only">Personal note</span>
-            <textarea
-              value={note}
-              maxLength={2000}
-              rows={6}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="Add a private note about this show"
-            />
-          </label>
-          <div className="note-actions">
-            <small>{note.length} / 2,000</small>
-            <button disabled={notePending} onClick={() => void saveNote()}>
-              {notePending ? "Saving…" : "Save note"}
-            </button>
-          </div>
-          {saveState && (
-            <p className="save-state" role="status">
-              {saveState}
-            </p>
-          )}
-          <h2>Where to watch</h2>
-          {detail.providers.length ? (
-            detail.providers.map((provider) => (
-              <div key={`${provider.tmdbProviderId}-${provider.accessType}`}>
-                <strong>{provider.name}</strong>
-                <span>{provider.accessType}</span>
+              <div className="detail-progress" aria-hidden="true">
+                <span style={{ width: `${progressPercent}%` }} />
               </div>
-            ))
-          ) : (
-            <p>Availability unavailable</p>
+              <div className="detail-fact">
+                <span>Watched</span>
+                <strong>
+                  {detail.item.totalEpisodes === null
+                    ? "Unavailable"
+                    : `${detail.item.watchedEpisodes} of ${detail.item.totalEpisodes}`}
+                </strong>
+              </div>
+              <div className="detail-fact">
+                <span>Next</span>
+                <strong>{detail.item.nextEpisode ?? "Caught up"}</strong>
+              </div>
+              <div className="detail-fact">
+                <span>Status</span>
+                <strong>
+                  {
+                    {
+                      continue: "Continue",
+                      "caught-up": "Caught up",
+                      watchlist: "Watchlist",
+                      finished: "Finished",
+                      stopped: "Stopped",
+                    }[detail.item.libraryView]
+                  }
+                </strong>
+              </div>
+              {primaryProvider && (
+                <div className="detail-fact">
+                  <span>Network</span>
+                  <strong>{primaryProvider}</strong>
+                </div>
+              )}
+            </section>
           )}
-          <small>
-            Streaming data provided by {detail.providerAttribution}.
-          </small>
+          <section className="side-card watch-card">
+            <small className="eyebrow">
+              {providerRegion === "CA" ? "Canada" : providerRegion}
+            </small>
+            <h2>Where to watch</h2>
+            {detail.providers.length ? (
+              detail.providers.map((provider) => (
+                <div
+                  className="provider-row"
+                  key={`${provider.tmdbProviderId}-${provider.accessType}`}
+                >
+                  {provider.logoPath ? (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w92${provider.logoPath}`}
+                      alt=""
+                    />
+                  ) : (
+                    <span className="provider-mark" aria-hidden="true">
+                      {provider.name.slice(0, 2)}
+                    </span>
+                  )}
+                  <div>
+                    <strong>{provider.name}</strong>
+                    <span>
+                      {
+                        {
+                          subscription: "Streaming subscription",
+                          free: "Free streaming",
+                          ads: "Streaming with ads",
+                          rent: "Available to rent",
+                          buy: "Available to buy",
+                        }[provider.accessType]
+                      }
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p>Availability unavailable</p>
+            )}
+            <p className="provider-note">
+              Availability can change. Streaming data provided by{" "}
+              {detail.providerAttribution}.
+            </p>
+          </section>
+          <section className="side-card manage-card">
+            <h2>Personal note</h2>
+            <label className="detail-field">
+              <span className="sr-only">Personal note</span>
+              <textarea
+                value={note}
+                maxLength={2000}
+                rows={5}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Add a private note about this show"
+              />
+            </label>
+            <div className="note-actions">
+              <small>{note.length} / 2,000</small>
+              <button disabled={notePending} onClick={() => void saveNote()}>
+                {notePending ? "Saving…" : "Save note"}
+              </button>
+            </div>
+            {saveState && (
+              <p className="save-state" role="status">
+                {saveState}
+              </p>
+            )}
+          </section>
         </aside>
       </div>
       {showConfirmation && detail.item.mediaType === "tv" && (
@@ -1628,12 +2397,299 @@ function ShowDetail({
     </section>
   );
 }
+function PersonDetailPage({
+  person,
+  onBack,
+}: {
+  person: CastMember;
+  onBack: () => void;
+}) {
+  const [detail, setDetail] = useState<PersonDetail | null>(null),
+    [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void api
+      .person(person.tmdbPersonId)
+      .then((value) => active && setDetail(value))
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, [person.tmdbPersonId]);
+  return (
+    <section className="person-detail">
+      <button className="back" onClick={onBack}>
+        ← Back to cast
+      </button>
+      <div className="person-detail-grid">
+        <div className="person-portrait">
+          <PersonAvatar
+            name={person.name}
+            path={detail?.profilePath ?? person.profilePath}
+          />
+        </div>
+        <article>
+          <small className="eyebrow">TMDB person detail</small>
+          <h1>{detail?.name ?? person.name}</h1>
+          <p className="person-role">{person.characterName ?? "Cast member"}</p>
+          {failed ? (
+            <p>Additional TMDB information is unavailable.</p>
+          ) : !detail ? (
+            <p>Loading TMDB information…</p>
+          ) : (
+            <>
+              <div className="person-facts">
+                {detail.knownForDepartment && (
+                  <span>{detail.knownForDepartment}</span>
+                )}
+                {detail.gender && <span>{detail.gender}</span>}
+                {detail.birthday && <span>Born {detail.birthday}</span>}
+                {detail.deathday && <span>Died {detail.deathday}</span>}
+                {detail.placeOfBirth && <span>{detail.placeOfBirth}</span>}
+                {detail.popularity !== null && (
+                  <span>TMDB popularity {detail.popularity.toFixed(1)}</span>
+                )}
+              </div>
+              <p>{detail.biography ?? "No biography is available from TMDB."}</p>
+              {detail.alsoKnownAs.length > 0 && (
+                <p className="person-aliases">
+                  <strong>Also known as:</strong>{" "}
+                  {detail.alsoKnownAs.join(", ")}
+                </p>
+              )}
+              <div className="person-links">
+                <a
+                  href={`https://www.themoviedb.org/person/${detail.tmdbPersonId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View on TMDB
+                </a>
+                {detail.imdbId && (
+                  <a
+                    href={`https://www.imdb.com/name/${detail.imdbId}/`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on IMDb
+                  </a>
+                )}
+                {detail.homepage?.startsWith("http") && (
+                  <a href={detail.homepage} target="_blank" rel="noreferrer">
+                    Official website
+                  </a>
+                )}
+              </div>
+            </>
+          )}
+        </article>
+      </div>
+      {detail && detail.knownCredits.length > 0 && (
+        <section className="known-credits">
+          <h2>Complete acting credits</h2>
+          <PersonCreditSection
+            title="Television"
+            credits={detail.knownCredits.filter(
+              (credit) => credit.mediaType === "tv",
+            )}
+          />
+          <PersonCreditSection
+            title="Movies"
+            credits={detail.knownCredits.filter(
+              (credit) => credit.mediaType === "movie",
+            )}
+          />
+        </section>
+      )}
+    </section>
+  );
+}
+
+function PersonCreditSection({
+  title,
+  credits,
+}: {
+  title: string;
+  credits: PersonDetail["knownCredits"];
+}) {
+  if (credits.length === 0) return null;
+  return (
+    <section className="credit-section">
+      <div className="detail-heading">
+        <h3>{title}</h3>
+        <span>{credits.length} credits</span>
+      </div>
+      <div className="credit-grid">
+        {credits.map((credit, index) => (
+          <article
+            key={`${credit.mediaType}-${credit.tmdbId}-${credit.characterName}-${index}`}
+          >
+            <Poster path={credit.posterPath} />
+            <strong>{credit.title}</strong>
+            <span>
+              {credit.year ?? "Year unavailable"} ·{" "}
+              {credit.mediaType === "tv" ? "TV" : "Movie"}
+            </span>
+            {credit.characterName && <small>{credit.characterName}</small>}
+            {credit.episodeCount !== null && (
+              <small>
+                {credit.episodeCount}{" "}
+                {credit.episodeCount === 1 ? "episode" : "episodes"}
+              </small>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EpisodeDetailPage({
+  showTitle,
+  tmdbId,
+  episode,
+  onBack,
+}: {
+  showTitle: string;
+  tmdbId: number;
+  episode: CatalogEpisode | EpisodeState;
+  onBack: () => void;
+}) {
+  const [detail, setDetail] = useState(episode),
+    [cast, setCast] = useState<CastMember[]>([]),
+    [castFailed, setCastFailed] = useState(false),
+    [selectedPerson, setSelectedPerson] = useState<CastMember | null>(null);
+  useEffect(() => {
+    let active = true;
+    void api
+      .catalogEpisode(
+        tmdbId,
+        episode.seasonNumber,
+        episode.episodeNumber,
+      )
+      .then((value) => {
+        if (active) {
+          setDetail(value);
+          setCast(value.cast);
+        }
+      })
+      .catch(() => active && setCastFailed(true));
+    return () => {
+      active = false;
+    };
+  }, [episode.episodeNumber, episode.seasonNumber, tmdbId]);
+  if (selectedPerson)
+    return (
+      <PersonDetailPage
+        person={selectedPerson}
+        onBack={() => setSelectedPerson(null)}
+      />
+    );
+  return (
+    <section className="episode-detail-page">
+      <button className="back" onClick={onBack}>
+        ← Back to {showTitle}
+      </button>
+      {detail.stillPath && (
+        <img
+          className="episode-still"
+          src={`https://image.tmdb.org/t/p/w780${detail.stillPath}`}
+          alt=""
+        />
+      )}
+      <small className="eyebrow">TMDB episode detail</small>
+      <h1>{detail.title ?? "Title unavailable"}</h1>
+      <div className="person-facts">
+        <span>
+          Season {detail.seasonNumber}, Episode {detail.episodeNumber}
+        </span>
+        {detail.airDate && <span>Aired {detail.airDate}</span>}
+        {detail.runtimeMinutes && <span>{detail.runtimeMinutes} minutes</span>}
+      </div>
+      <p>{detail.overview ?? "No episode synopsis is available from TMDB."}</p>
+      <section className="episode-cast">
+        <h2>Episode cast</h2>
+        {cast.length > 0 ? (
+          <div className="cast-grid">
+            {cast.map((person) => (
+              <article
+                key={`${person.tmdbPersonId}-${person.characterName}`}
+              >
+                <div className="avatar">
+                  <PersonAvatar name={person.name} path={person.profilePath} />
+                </div>
+                <button
+                  className="detail-text-link"
+                  onClick={() => setSelectedPerson(person)}
+                >
+                  {person.name}
+                </button>
+                <span>{person.characterName ?? "Role unavailable"}</span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p>
+            {castFailed
+              ? "Episode cast is unavailable from TMDB."
+              : "Loading episode cast…"}
+          </p>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function FullCastPage({
+  title,
+  cast,
+  onPerson,
+  onBack,
+}: {
+  title: string;
+  cast: CastMember[];
+  onPerson: (person: CastMember) => void;
+  onBack: () => void;
+}) {
+  return (
+    <section className="full-cast">
+      <button className="back" onClick={onBack}>
+        ← Back to {title}
+      </button>
+      <header>
+        <h1>Full cast</h1>
+        <p>
+          {title} · {cast.length} credited performers
+        </p>
+      </header>
+      <div className="cast-grid">
+        {cast.map((person) => (
+          <article key={`${person.tmdbPersonId}-${person.characterName}`}>
+            <div className="avatar">
+              <PersonAvatar name={person.name} path={person.profilePath} />
+            </div>
+            <button
+              className="detail-text-link"
+              onClick={() => onPerson(person)}
+            >
+              {person.name}
+            </button>
+            <span>{person.characterName ?? "Role unavailable"}</span>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function CastPreview({
   detail,
   onFull,
+  onPerson,
 }: {
   detail: ShowDetailData;
   onFull: () => void;
+  onPerson: (person: CastMember) => void;
 }) {
   return (
     <>
@@ -1642,12 +2698,17 @@ function CastPreview({
         <button onClick={onFull}>View full cast</button>
       </div>
       <div className="cast-row">
-        {detail.cast.slice(0, 4).map((person) => (
+        {detail.cast.slice(0, 5).map((person) => (
           <article key={`${person.tmdbPersonId}-${person.characterName}`}>
             <div className="avatar">
               <PersonAvatar name={person.name} path={person.profilePath} />
             </div>
-            <strong>{person.name}</strong>
+            <button
+              className="detail-text-link"
+              onClick={() => onPerson(person)}
+            >
+              {person.name}
+            </button>
             <span>{person.characterName ?? "Role unavailable"}</span>
           </article>
         ))}
@@ -1656,7 +2717,15 @@ function CastPreview({
   );
 }
 function PersonAvatar({ name, path }: { name: string; path: string | null }) {
-  if (!path) return <span aria-hidden="true">{name[0]}</span>;
+  const nameParts = name.trim().split(/\s+/).filter(Boolean),
+    initials =
+      `${nameParts[0]?.[0] ?? ""}${nameParts.length > 1 ? (nameParts.at(-1)?.[0] ?? "") : ""}`.toUpperCase();
+  if (!path)
+    return (
+      <span className="avatar-initials" aria-hidden="true">
+        {initials}
+      </span>
+    );
   return (
     <>
       <img
@@ -1666,7 +2735,33 @@ function PersonAvatar({ name, path }: { name: string; path: string | null }) {
           event.currentTarget.hidden = true;
         }}
       />
-      <span aria-hidden="true">{name[0]}</span>
+      <span className="avatar-initials" aria-hidden="true">
+        {initials}
+      </span>
     </>
+  );
+}
+
+function DetailPoster({ title, path }: { title: string; path: string | null }) {
+  const initials = title
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  return (
+    <div className="detail-poster">
+      {path && (
+        <img
+          src={`https://image.tmdb.org/t/p/w342${path}`}
+          alt=""
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
+      )}
+      <span aria-hidden="true">{initials || "TV"}</span>
+    </div>
   );
 }

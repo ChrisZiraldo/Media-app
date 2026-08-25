@@ -24,6 +24,7 @@ function item(overrides: Partial<LibraryItem> = {}): LibraryItem {
     runtimeMinutes: null,
     showStatus: "Ended",
     status: "watching",
+    favorite: false,
     note: null,
     watchedEpisodes: 1,
     totalEpisodes: 2,
@@ -86,6 +87,171 @@ describe("Media Tracker shell", () => {
     expect(
       screen.getByRole("heading", { name: "Watchlist" }),
     ).toBeInTheDocument();
+  });
+
+  it("lists starred shows under the User favourites view", async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) =>
+      String(input).includes("libraryView=shows")
+        ? json({ items: [item({ favorite: true })] })
+        : json({ items: [] }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Favourites" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Favourites" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Dexter" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "User" })).toBeVisible();
+  });
+
+  it("reloads the selected library when leaving show details", async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith(`/api/v1/library/${id}`)) return json(showDetail());
+      if (url.includes("libraryView=continue"))
+        return json({ items: [item()] });
+      return json({ items: [] });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    window.history.replaceState({}, "", `/shows/${id}`);
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Dexter" }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.filter(([input]) =>
+          String(input).includes("libraryView=continue"),
+        ),
+      ).toHaveLength(1),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.filter(([input]) =>
+          String(input).includes("libraryView=continue"),
+        ),
+      ).toHaveLength(2),
+    );
+    expect(screen.queryByText("Loading library…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dexter" })).toBeInTheDocument();
+  });
+
+  it("matches the balanced detail hierarchy", async () => {
+    const detail = showDetail();
+    let favorite = false;
+    detail.item.status = "watched";
+    detail.providers = [
+      {
+        tmdbProviderId: 8,
+        name: "Netflix",
+        logoPath: null,
+        region: "CA",
+        accessType: "subscription",
+        displayPriority: 1,
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init) => {
+        if (String(input).endsWith(`/api/v1/library/${id}`)) {
+          if (init?.method === "PATCH") {
+            favorite = true;
+            return new Response(null, { status: 204 });
+          }
+          return json({ ...detail, item: { ...detail.item, favorite } });
+        }
+        return json({ items: [] });
+      }),
+    );
+    window.history.replaceState({}, "", `/shows/${id}`);
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Dexter" }),
+    ).toBeVisible();
+    expect(screen.getByText("2006")).toBeInTheDocument();
+    expect(screen.getByText("Crime")).toBeInTheDocument();
+    expect(screen.getAllByText("Netflix").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("heading", { name: "Your progress" }),
+    ).toBeVisible();
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Streaming subscription")).toBeInTheDocument();
+    expect(screen.getByText("Canada")).toBeInTheDocument();
+    expect(screen.getByLabelText("Canonical status: Watching")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Mark S1 E2 watched" }),
+    ).toHaveClass("primary-action");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add Dexter to favourites" }),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Remove Dexter from favourites",
+      }),
+    ).toHaveTextContent("★");
+  });
+
+  it("renders prototype-style Diary and Upcoming rows", async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/activity/diary"))
+        return json({
+          items: [
+            {
+              id: "event-1",
+              mediaId: id,
+              title: "Dexter",
+              eventType: "episode_watched",
+              seasonNumber: 1,
+              episodeNumber: 2,
+              episodeTitle: "Crocodile",
+              posterPath: "/poster.jpg",
+              occurredAt: new Date().toISOString(),
+            },
+          ],
+        });
+      if (url.endsWith("/api/v1/activity/upcoming"))
+        return json({
+          items: [
+            {
+              mediaId: id,
+              title: "Silo",
+              posterPath: "/silo.jpg",
+              seasonNumber: 3,
+              episodeNumber: 9,
+              episodeTitle: "Farewell",
+              airDate: "2099-08-27",
+            },
+          ],
+        });
+      return json({ items: [] });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Diary" }));
+    expect(
+      await screen.findByRole("heading", { name: "Recent viewing" }),
+    ).toBeVisible();
+    expect(screen.getByText("Crocodile")).toBeInTheDocument();
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dexter" }));
+    expect(window.location.pathname).toBe(`/shows/${id}`);
+
+    fireEvent.click(screen.getByRole("button", { name: "Upcoming" }));
+    expect(await screen.findByRole("button", { name: "Silo" })).toBeVisible();
+    expect(screen.getByText("· S3 E9")).toBeInTheDocument();
+    expect(screen.getByText("Farewell")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Silo" }));
+    expect(window.location.pathname).toBe(`/shows/${id}`);
   });
 
   it("collapses and restores the desktop navigation", () => {
@@ -210,7 +376,7 @@ describe("Media Tracker shell", () => {
     );
   });
 
-  it("identifies an existing catalog result and opens its details", async () => {
+  it("opens the first existing catalog result with Enter", async () => {
     const id = "00000000-0000-4000-8000-000000000000",
       catalogItem = {
         tmdbId: 1405,
@@ -257,7 +423,8 @@ describe("Media Tracker shell", () => {
       });
     vi.stubGlobal("fetch", fetcher);
     render(<App />);
-    fireEvent.change(screen.getByRole("textbox", { name: "Search shows" }), {
+    const search = screen.getByRole("textbox", { name: "Search shows" });
+    fireEvent.change(search, {
       target: { value: "Dexter" },
     });
 
@@ -265,7 +432,94 @@ describe("Media Tracker shell", () => {
     expect(
       screen.queryByRole("button", { name: "★ Watchlist" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "View details" }));
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(window.location.pathname).toBe(`/shows/${id}`);
+  });
+
+  it("dismisses search outside and opens untracked catalog details without adding", async () => {
+    const id = "00000000-0000-4000-8000-000000000001",
+      catalogItem = {
+        tmdbId: 1405,
+        mediaType: "tv" as const,
+        title: "Dexter",
+        overview: "A forensic analyst.",
+        posterPath: null,
+        backdropPath: null,
+        releaseDate: null,
+        firstAirDate: "2006-10-01",
+        genres: ["Crime"],
+      },
+      fetcher = vi.fn(
+        async (input: string | URL | Request, _init?: RequestInit) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/library") && _init?.method === "POST")
+            return json({ id });
+          if (
+            url.endsWith(`/api/v1/library/${id}/episodes/1/1`) &&
+            _init?.method === "PUT"
+          )
+            return new Response(null, { status: 204 });
+          if (url.includes("/api/v1/search"))
+            return json({ items: [catalogItem], page: 1, totalPages: 1 });
+          if (url.endsWith("/api/v1/catalog/tv/1405"))
+            return json({
+              item: catalogItem,
+              episodes: [
+                {
+                  seasonNumber: 1,
+                  episodeNumber: 1,
+                  title: "Dexter",
+                  overview: null,
+                  airDate: "2006-10-01",
+                  runtimeMinutes: 50,
+                  stillPath: null,
+                },
+              ],
+              cast: [],
+              providers: [],
+              providerAttribution: "JustWatch",
+            });
+          return json({ items: [] });
+        },
+      );
+    vi.stubGlobal("fetch", fetcher);
+    render(<App />);
+    const search = screen.getByRole("textbox", { name: "Search shows" });
+    fireEvent.change(search, { target: { value: "Dexter" } });
+
+    expect(await screen.findByRole("button", { name: "Dexter" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "★ Watchlist" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "View details" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Start watching" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add as watched" })).toBeNull();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByLabelText("TMDB search results")).toBeNull();
+    fireEvent.focus(search);
+    fireEvent.click(screen.getByRole("button", { name: "Dexter" }));
+    expect(window.location.pathname).toBe("/catalog/tv/1405");
+    expect(
+      await screen.findByRole("heading", { name: "Dexter" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "View full cast" }));
+    expect(window.location.pathname).toBe("/catalog/tv/1405/cast");
+    expect(
+      await screen.findByRole("heading", { name: "Full cast" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "← Back to Dexter" }));
+    expect(window.location.pathname).toBe("/catalog/tv/1405");
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
+      false,
+    );
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Mark S1 E1 watched" }),
+    );
+    await waitFor(() =>
+      expect(fetcher).toHaveBeenCalledWith(
+        `/api/v1/library/${id}/episodes/1/1`,
+        expect.objectContaining({ method: "PUT" }),
+      ),
+    );
     expect(window.location.pathname).toBe(`/shows/${id}`);
   });
 
@@ -287,6 +541,14 @@ describe("Media Tracker shell", () => {
       await screen.findByRole("heading", { name: "Dexter" }),
     ).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Mark S1 E2 watched" }));
+    await waitFor(() =>
+      expect(fetcher).toHaveBeenCalledWith(
+        `/api/v1/library/${id}/actions/mark-next`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+
     fireEvent.click(screen.getAllByRole("checkbox")[1]!);
     await waitFor(() =>
       expect(fetcher).toHaveBeenCalledWith(
@@ -299,6 +561,13 @@ describe("Media Tracker shell", () => {
     )?.[1];
     expect(new Headers(episodeRequest?.headers).has("Content-Type")).toBe(
       false,
+    );
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.filter(([input]) =>
+          String(input).includes("libraryView=continue"),
+        ).length,
+      ).toBeGreaterThanOrEqual(2),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Mark season watched" }),
@@ -321,25 +590,6 @@ describe("Media Tracker shell", () => {
       expect(fetcher).toHaveBeenCalledWith(
         `/api/v1/library/${id}/episodes/watched`,
         expect.objectContaining({ method: "PUT" }),
-      ),
-    );
-    fireEvent.change(screen.getByRole("combobox", { name: "Library status" }), {
-      target: { value: "stopped" },
-    });
-    await waitFor(() =>
-      expect(fetcher).toHaveBeenCalledWith(
-        `/api/v1/library/${id}`,
-        expect.objectContaining({
-          method: "PATCH",
-          body: JSON.stringify({ status: "stopped" }),
-        }),
-      ),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Refresh from TMDB" }));
-    await waitFor(() =>
-      expect(fetcher).toHaveBeenCalledWith(
-        `/api/v1/library/${id}/actions/refresh`,
-        expect.objectContaining({ method: "POST" }),
       ),
     );
     fireEvent.change(screen.getByRole("textbox", { name: "Personal note" }), {
@@ -461,6 +711,8 @@ describe("Media Tracker shell", () => {
         });
       if (url.endsWith("/api/v1/admin/import.csv"))
         return json({ imported: 1 });
+      if (url.endsWith("/api/v1/admin/data"))
+        return new Response(null, { status: 204 });
       return json({ items: [] });
     });
     vi.stubGlobal("fetch", fetcher);
@@ -504,6 +756,19 @@ describe("Media Tracker shell", () => {
           String(input).includes("libraryView=shows"),
         ).length,
       ).toBeGreaterThanOrEqual(2),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete all data" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "This permanently deletes every show",
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Delete all data" })[1]!,
+    );
+    expect(await screen.findByText("All library data deleted")).toBeInTheDocument();
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/v1/admin/data",
+      expect.objectContaining({ method: "DELETE" }),
     );
     click.mockRestore();
   });

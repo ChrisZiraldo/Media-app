@@ -7,6 +7,7 @@ import type {
 import type { LibraryStatus } from "../../shared/media-schema.js";
 import type {
   ActivityItem,
+  CatalogDetail,
   EpisodeState,
   LibraryItem,
   ShowDetail,
@@ -44,6 +45,26 @@ export class MediaService {
     return this.tmdb.search(query, type, page);
   }
 
+  personDetail(tmdbPersonId: number) {
+    if (!this.tmdb)
+      throw new ServiceUnavailableError("TMDB person details are not configured");
+    return this.tmdb.getPerson(tmdbPersonId);
+  }
+
+  episodeDetail(tmdbId: number, seasonNumber: number, episodeNumber: number) {
+    if (!this.tmdb)
+      throw new ServiceUnavailableError("TMDB episode details are not configured");
+    return this.tmdb.getEpisode(tmdbId, seasonNumber, episodeNumber);
+  }
+
+  async catalogDetail(
+    tmdbId: number,
+    mediaType: "movie" | "tv",
+  ): Promise<CatalogDetail> {
+    const detail = await this.catalogMetadata(tmdbId, mediaType);
+    return { ...detail, providerAttribution: "JustWatch" };
+  }
+
   addNormalizedCatalogItem(item: CatalogMedia, status: LibraryStatus): string {
     return this.repository.addOrUpdate(item, status);
   }
@@ -55,10 +76,18 @@ export class MediaService {
   ): Promise<string> {
     if (!this.tmdb)
       throw new ServiceUnavailableError("Catalog search is not configured");
+    if (this.repository.findByCatalogIdentity(tmdbId, mediaType))
+      throw Object.assign(new Error("This title is already in the library"), {
+        statusCode: 409,
+      });
     const { item, cast, providers, episodes } = await this.catalogMetadata(
       tmdbId,
       mediaType,
     );
+    if (this.repository.findByCatalogIdentity(tmdbId, mediaType))
+      throw Object.assign(new Error("This title is already in the library"), {
+        statusCode: 409,
+      });
     return this.persistCatalogMetadata(item, status, cast, providers, episodes);
   }
 
@@ -131,6 +160,9 @@ export class MediaService {
   setNote(id: string, note: string | null): void {
     this.repository.setNote(id, note);
   }
+  setFavorite(id: string, favorite: boolean): void {
+    this.repository.setFavorite(id, favorite);
+  }
   markNext(id: string) {
     return this.repository.markNextAvailable(id);
   }
@@ -187,12 +219,66 @@ export class MediaService {
     const shows = importCsv(csv);
     return this.repository.transaction(() => {
       for (const show of shows) {
-        const id = this.repository.addOrUpdate(show.item, show.status);
-        this.repository.upsertEpisodes(id, show.episodes);
-        this.repository.replaceEpisodeStates(id, show.episodes);
+        const existingId = this.repository.findByCatalogIdentity(
+            show.item.tmdbId,
+            show.item.mediaType,
+          ),
+          current = existingId
+            ? this.repository.list().find((item) => item.id === existingId)
+            : undefined,
+          currentEpisodes = existingId
+            ? this.repository.listEpisodes(existingId)
+            : [],
+          currentByEpisode = new Map(
+            currentEpisodes.map((episode) => [
+              `${episode.seasonNumber}:${episode.episodeNumber}`,
+              episode,
+            ]),
+          ),
+          mergedEpisodes = show.episodes.map((episode) => {
+            const existing = currentByEpisode.get(
+              `${episode.seasonNumber}:${episode.episodeNumber}`,
+            );
+            currentByEpisode.delete(
+              `${episode.seasonNumber}:${episode.episodeNumber}`,
+            );
+            return {
+              ...episode,
+              watched: episode.watched || Boolean(existing?.watched),
+              watchedAt: existing?.watched
+                ? existing.watchedAt
+                : episode.watchedAt,
+            };
+          });
+        mergedEpisodes.push(...currentByEpisode.values());
+        const watchedCount = mergedEpisodes.filter(
+            (episode) => episode.watched,
+          ).length,
+          mergedStatus: LibraryStatus =
+            current?.status === "watched" ||
+            show.status === "watched" ||
+            (mergedEpisodes.length > 0 && watchedCount === mergedEpisodes.length)
+              ? "watched"
+              : current?.status === "stopped" || show.status === "stopped"
+                ? "stopped"
+                : watchedCount > 0
+                  ? "watching"
+                  : "watchlist",
+          id = existingId ??
+            this.repository.addOrUpdate(show.item, mergedStatus);
+        this.repository.upsertEpisodes(id, mergedEpisodes);
+        this.repository.replaceEpisodeStates(id, mergedEpisodes);
+        this.repository.addOrUpdate(show.item, mergedStatus);
+        this.repository.setFavorite(
+          id,
+          Boolean(current?.favorite) || show.favorite,
+        );
         this.repository.setLibraryUpdatedAt(id, show.updatedAt);
       }
       return shows.length;
     });
+  }
+  deleteAllData(): void {
+    this.repository.deleteAllData();
   }
 }

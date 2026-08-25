@@ -2,8 +2,10 @@ import { z } from "zod";
 import type {
   CastMember,
   CatalogEpisode,
+  CatalogEpisodeDetail,
   CatalogMedia,
   CatalogSearchPage,
+  PersonDetail,
   WatchProvider,
 } from "../../shared/catalog-types.js";
 import type { MediaType } from "../../shared/media-schema.js";
@@ -60,6 +62,37 @@ const seasonSchema = z.object({
     }),
   ),
 });
+const episodeDetailSchema = z.object({
+  season_number: z.number().int().min(0),
+  episode_number: z.number().int().min(1),
+  name: z.string().nullable().optional(),
+  overview: z.string().nullable().optional(),
+  air_date: z.string().nullable().optional(),
+  runtime: z.number().nullable().optional(),
+  still_path: z.string().nullable().optional(),
+  guest_stars: z
+    .array(
+      z.object({
+        id: z.number().int().positive(),
+        name: z.string(),
+        character: z.string().nullable().optional(),
+        profile_path: z.string().nullable().optional(),
+        order: z.number().int().min(0).optional(),
+      }),
+    )
+    .optional(),
+});
+const episodeCreditPersonSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+  character: z.string().nullable().optional(),
+  profile_path: z.string().nullable().optional(),
+  order: z.number().int().min(0).optional(),
+});
+const episodeCreditsSchema = z.object({
+  cast: z.array(episodeCreditPersonSchema).optional(),
+  guest_stars: z.array(episodeCreditPersonSchema).optional(),
+});
 const creditsSchema = z.object({
   cast: z.array(
     z.object({
@@ -70,6 +103,55 @@ const creditsSchema = z.object({
       order: z.number().int().min(0),
     }),
   ),
+});
+const aggregateCreditsSchema = z.object({
+  cast: z.array(
+    z.object({
+      id: z.number().int().positive(),
+      name: z.string(),
+      profile_path: z.string().nullable().optional(),
+      order: z.number().int().min(0),
+      roles: z.array(
+        z.object({
+          character: z.string().nullable().optional(),
+          episode_count: z.number().int().min(0).optional(),
+        }),
+      ),
+    }),
+  ),
+});
+const personSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+  biography: z.string().nullable().optional(),
+  birthday: z.string().nullable().optional(),
+  deathday: z.string().nullable().optional(),
+  place_of_birth: z.string().nullable().optional(),
+  known_for_department: z.string().nullable().optional(),
+  profile_path: z.string().nullable().optional(),
+  also_known_as: z.array(z.string()).optional(),
+  gender: z.number().int().min(0).max(3).optional(),
+  homepage: z.string().nullable().optional(),
+  imdb_id: z.string().nullable().optional(),
+  popularity: z.number().nullable().optional(),
+  combined_credits: z
+    .object({
+      cast: z.array(
+        z.object({
+          id: z.number().int().positive(),
+          media_type: z.enum(["movie", "tv"]),
+          title: z.string().optional(),
+          name: z.string().optional(),
+          character: z.string().nullable().optional(),
+          release_date: z.string().nullable().optional(),
+          first_air_date: z.string().nullable().optional(),
+          poster_path: z.string().nullable().optional(),
+          popularity: z.number().optional(),
+          episode_count: z.number().int().min(0).optional(),
+        }),
+      ),
+    })
+    .optional(),
 });
 const providerSchema = z.object({
   results: z.record(
@@ -317,10 +399,63 @@ export class TmdbClient {
     }));
   }
 
+  async getEpisode(
+    tmdbId: number,
+    seasonNumber: number,
+    episodeNumber: number,
+  ): Promise<CatalogEpisodeDetail> {
+    const [episodeResult, creditsResult] = await Promise.all([
+      this.getJson(
+        new URL(
+          `${this.baseUrl}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}`,
+        ),
+      ),
+      this.getJson(
+        new URL(
+          `${this.baseUrl}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/credits`,
+        ),
+      ),
+    ]);
+    const parsed = episodeDetailSchema.safeParse(episodeResult),
+      parsedCredits = episodeCreditsSchema.safeParse(creditsResult);
+    if (!parsed.success || !parsedCredits.success)
+      throw new TmdbError("TMDB returned malformed data");
+    const episode = parsed.data,
+      creditedPeople = [
+        ...(parsedCredits.data.cast ?? []),
+        ...(parsedCredits.data.guest_stars ?? []),
+        ...(episode.guest_stars ?? []),
+      ].filter(
+        (person, index, people) =>
+          people.findIndex((candidate) => candidate.id === person.id) === index,
+      );
+    return {
+      seasonNumber: episode.season_number,
+      episodeNumber: episode.episode_number,
+      title: episode.name || null,
+      overview: episode.overview || null,
+      airDate: episode.air_date || null,
+      runtimeMinutes: episode.runtime ?? null,
+      stillPath: episode.still_path || null,
+      cast: creditedPeople.map((person, index) => ({
+        tmdbPersonId: person.id,
+        name: person.name,
+        characterName: person.character || null,
+        profilePath: person.profile_path || null,
+        sortOrder: person.order ?? index,
+      })),
+    };
+  }
+
   async getCast(tmdbId: number, mediaType: MediaType): Promise<CastMember[]> {
-    const parsed = creditsSchema.safeParse(
+    const aggregate = mediaType === "tv";
+    const parsed = (
+      aggregate ? aggregateCreditsSchema : creditsSchema
+    ).safeParse(
       await this.getJson(
-        new URL(`${this.baseUrl}/${mediaType}/${tmdbId}/credits`),
+        new URL(
+          `${this.baseUrl}/${mediaType}/${tmdbId}/${aggregate ? "aggregate_credits" : "credits"}`,
+        ),
       ),
     );
     if (!parsed.success) throw new TmdbError("TMDB returned malformed data");
@@ -328,11 +463,80 @@ export class TmdbClient {
       .map((person) => ({
         tmdbPersonId: person.id,
         name: person.name,
-        characterName: person.character || null,
+        characterName:
+          "roles" in person
+            ? [
+                ...new Set(
+                  person.roles.map((role) => role.character).filter(Boolean),
+                ),
+              ].join(" / ") || null
+            : person.character || null,
         profilePath: person.profile_path || null,
         sortOrder: person.order,
       }))
       .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async getPerson(tmdbPersonId: number): Promise<PersonDetail> {
+    const url = new URL(`${this.baseUrl}/person/${tmdbPersonId}`);
+    url.searchParams.set("append_to_response", "combined_credits");
+    const parsed = personSchema.safeParse(
+      await this.getJson(url),
+    );
+    if (!parsed.success) throw new TmdbError("TMDB returned malformed data");
+    const person = parsed.data;
+    return {
+      tmdbPersonId: person.id,
+      name: person.name,
+      biography: person.biography || null,
+      birthday: person.birthday || null,
+      deathday: person.deathday || null,
+      placeOfBirth: person.place_of_birth || null,
+      knownForDepartment: person.known_for_department || null,
+      profilePath: person.profile_path || null,
+      alsoKnownAs: person.also_known_as ?? [],
+      gender:
+        ({ 1: "Female", 2: "Male", 3: "Non-binary" } as Record<number, string>)[
+          person.gender ?? 0
+        ] ?? null,
+      homepage: person.homepage || null,
+      imdbId: person.imdb_id || null,
+      popularity: person.popularity ?? null,
+      knownCredits: (person.combined_credits?.cast ?? [])
+        .flatMap((credit) => {
+          const title = (credit.media_type === "movie" ? credit.title : credit.name)?.trim();
+          if (!title) return [];
+          const date =
+            credit.media_type === "movie"
+              ? credit.release_date
+              : credit.first_air_date;
+          return [{
+            tmdbId: credit.id,
+            mediaType: credit.media_type,
+            title,
+            characterName: credit.character || null,
+            year: date?.slice(0, 4) || null,
+            posterPath: credit.poster_path || null,
+            episodeCount:
+              credit.media_type === "tv" ? credit.episode_count ?? null : null,
+            popularity: credit.popularity ?? 0,
+          }];
+        })
+        .sort(
+          (a, b) =>
+            Number(b.year ?? 0) - Number(a.year ?? 0) ||
+            b.popularity - a.popularity,
+        )
+        .map((credit) => ({
+          tmdbId: credit.tmdbId,
+          mediaType: credit.mediaType,
+          title: credit.title,
+          characterName: credit.characterName,
+          year: credit.year,
+          posterPath: credit.posterPath,
+          episodeCount: credit.episodeCount,
+        })),
+    };
   }
 
   async getWatchProviders(

@@ -26,3 +26,17 @@
   padding: 18px 14px;
   color: #a8b4ba;
 }
+.search-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e0e7ea;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.search-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}

@@ -7,6 +7,7 @@ export interface TransferEpisode extends CatalogEpisode {
 export interface TransferShow {
   item: CatalogMedia;
   status: LibraryStatus;
+  favorite: boolean;
   currentSeason: number | null;
   updatedAt: string;
   episodes: TransferEpisode[];
