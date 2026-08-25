@@ -17,6 +17,11 @@ describe("deployment assets", () => {
     expect(unit).toContain("dist/server/main.js");
   });
 
+  it("builds browser assets for the mounted Tailnet /media path", () => {
+    const viteConfig = fs.readFileSync(path.resolve("vite.config.ts"), "utf8");
+    expect(viteConfig).toContain('base: "/media/"');
+  });
+
   it("checks service, local health, and optional Tailnet health silently", () => {
     const watchdog = read("media-app-watchdog.sh");
     expect(watchdog).toContain("systemctl --user is-active --quiet");
