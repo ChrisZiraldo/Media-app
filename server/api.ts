@@ -485,6 +485,14 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
       root: options.staticRoot,
       prefix: "/media/",
     });
+    // Tailscale Serve strips a mounted path prefix before proxying. Keep a
+    // root asset alias so browser requests for /media/assets/... resolve after
+    // the /media prefix has been removed.
+    void app.register(fastifyStatic, {
+      root: `${options.staticRoot}/assets`,
+      prefix: "/assets/",
+      decorateReply: false,
+    });
     app.get("/", (_request, reply) => reply.sendFile("index.html"));
     app.get("/media", (_request, reply) => reply.redirect("/media/"));
     app.get("/media/", (_request, reply) => reply.sendFile("index.html"));

@@ -40,12 +40,17 @@ describe("HTTP application", () => {
       method: "GET",
       url: "/media/assets/app.js",
     });
+    const proxyStrippedAsset = await app.inject({
+      method: "GET",
+      url: "/assets/app.js",
+    });
     const prefixedApi = await app.inject({
       method: "GET",
       url: "/media/health",
     });
     expect(prefixedPage.statusCode).toBe(200);
     expect(prefixedAsset.statusCode).toBe(200);
+    expect(proxyStrippedAsset.statusCode).toBe(200);
     expect(prefixedApi.json()).toEqual({ ok: true });
     await app.close();
     fs.rmSync(root, { recursive: true, force: true });
