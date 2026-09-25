@@ -58,6 +58,12 @@ export interface LibraryQuery {
   direction?: "asc" | "desc";
 }
 
+export interface MissingSynopsisItem {
+  id: string;
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+}
+
 function deriveView(row: LibraryRow): Exclude<LibraryView, "shows"> {
   if (row.status === "watchlist") return "watchlist";
   if (row.status === "stopped") return "stopped";
@@ -207,6 +213,18 @@ export class MediaRepository {
       throw Object.assign(new Error("Library item not found"), {
         statusCode: 404,
       });
+  }
+  listMissingSynopses(): MissingSynopsisItem[] {
+    return this.database
+      .prepare(
+        "SELECT id,tmdb_id AS tmdbId,media_type AS mediaType FROM media_items WHERE overview IS NULL OR trim(overview)='' ORDER BY lower(title)",
+      )
+      .all() as MissingSynopsisItem[];
+  }
+  setOverview(mediaId: string, overview: string): void {
+    this.database
+      .prepare("UPDATE media_items SET overview=?,updated_at=? WHERE id=?")
+      .run(overview, new Date().toISOString(), mediaId);
   }
   deleteAllData(): void {
     this.database.transaction(() => {

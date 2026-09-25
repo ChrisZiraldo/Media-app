@@ -49,6 +49,12 @@
   padding-inline: 4px !important;
   text-align: center;
 }
+.marker-column > .filter-menu {
+  display: inline-block;
+}
+.marker-column .filter-menu > div {
+  text-align: left;
+}
 .show-markers {
   display: inline-flex;
   min-width: 20px;

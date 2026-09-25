@@ -296,7 +296,9 @@ Library-view table columns are tailored to the decision being made:
   guaranteed by the view definition.
 - All library tables place a narrow, unlabeled marker column immediately after
   title. It shows a gold star for a favourite, a two-person hugging icon for a
-  Watch Together show, both icons when both flags apply, or remains empty.
+  Watch Together show, both icons when both flags apply, or remains empty. Its
+  icon-only funnel filters the current page to Favourites or Watch Together;
+  a show carrying both markers appears under either filter.
 - All shows: title, marker, library view, progress, genre, provider, next episode, last
   updated, and an unlabeled quick-action column.
 

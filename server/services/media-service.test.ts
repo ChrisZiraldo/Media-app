@@ -282,4 +282,29 @@ describe("MediaService catalog additions", () => {
     ]);
     database.close();
   });
+
+  it("backfills only missing synopses without changing library activity", async () => {
+    const { database, repository } = setup(),
+      id = repository.addOrUpdate({ ...details, overview: null }, "watchlist");
+    repository.setFavorite(id, true);
+    const before = repository.list()[0]!,
+      tmdb = {
+        getDetails: vi.fn(async () => details),
+      } as unknown as TmdbClient,
+      service = new MediaService(repository, tmdb);
+
+    await expect(service.backfillMissingSynopses()).resolves.toEqual({
+      checked: 1,
+      updated: 1,
+      unavailable: 0,
+      failed: 0,
+    });
+    expect(repository.list()[0]).toMatchObject({
+      overview: "A forensic analyst.",
+      favorite: true,
+      status: "watchlist",
+      updatedAt: before.updatedAt,
+    });
+    database.close();
+  });
 });

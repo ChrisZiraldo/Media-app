@@ -722,6 +722,7 @@ function LibraryTable({
     [genre, setGenre] = useState(""),
     [provider, setProvider] = useState(""),
     [libraryView, setLibraryView] = useState(""),
+    [marker, setMarker] = useState(""),
     [removeTarget, setRemoveTarget] = useState<LibraryItem | null>(null),
     [removePending, setRemovePending] = useState(false),
     [actionError, setActionError] = useState(""),
@@ -741,7 +742,9 @@ function LibraryTable({
       (item) =>
         (!genre || item.genre.includes(genre)) &&
         (!provider || item.provider === provider) &&
-        (!libraryView || item.libraryView === libraryView),
+        (!libraryView || item.libraryView === libraryView) &&
+        (!marker ||
+          (marker === "favorite" ? item.favorite : item.watchTogether)),
     )
     .sort((a, b) => {
       if (!sort) return 0;
@@ -760,7 +763,7 @@ function LibraryTable({
         sort.direction
       );
     });
-  const hasFilters = Boolean(genre || provider || libraryView);
+  const hasFilters = Boolean(genre || provider || libraryView || marker);
   function cycle(key: SortKey) {
     setSort((current) =>
       current?.key === key
@@ -874,7 +877,17 @@ function LibraryTable({
                 </button>
               </span>
             </th>
-            <th className="marker-column" aria-label="Show markers"></th>
+            <th className="marker-column" aria-label="Show markers">
+              <FilterMenu
+                label="marker"
+                values={["favorite", "watchTogether"]}
+                selected={marker}
+                onSelect={setMarker}
+                formatValue={(value) =>
+                  value === "favorite" ? "Favourites" : "Watch together"
+                }
+              />
+            </th>
             {showsLibraryView && (
               <th>
                 <span className="column-heading">
@@ -974,6 +987,7 @@ function LibraryTable({
                       setGenre("");
                       setProvider("");
                       setLibraryView("");
+                      setMarker("");
                     }}
                   >
                     Clear filters
@@ -1240,8 +1254,13 @@ function FilterMenu({
   onSelect: (value: string) => void;
   formatValue?: (value: string) => string;
 }) {
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  function select(value: string) {
+    onSelect(value);
+    if (menuRef.current) menuRef.current.open = false;
+  }
   return (
-    <details className={`filter-menu ${selected ? "active" : ""}`}>
+    <details ref={menuRef} className={`filter-menu ${selected ? "active" : ""}`}>
       <summary aria-label={`Filter by ${label}`}>
         <svg
           aria-hidden="true"
@@ -1259,9 +1278,9 @@ function FilterMenu({
         </svg>
       </summary>
       <div>
-        <button onClick={() => onSelect("")}>All {label}s</button>
+        <button onClick={() => select("")}>All {label}s</button>
         {values.map((value) => (
-          <button key={value} onClick={() => onSelect(value)}>
+          <button key={value} onClick={() => select(value)}>
             {formatValue(value)}
           </button>
         ))}

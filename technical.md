@@ -803,4 +803,5 @@ interval such as 30 minutes.
   the show-detail star toggles that flag through the library PATCH endpoint.
 - Watch Together uses the persisted `watch_together` flag. Show detail toggles
   it through the same PATCH endpoint, and every library table renders it in the
-  unlabeled marker column immediately after Title.
+  unlabeled marker column immediately after Title. That column's funnel applies
+  a client-side `favorite` or `watchTogether` filter to the current view.

@@ -11,6 +11,7 @@ const configSchema = z.object({
     .transform((value) => value.toUpperCase())
     .default("CA"),
   TMDB_API_KEY: z.string().trim().min(1).optional(),
+  TMDB_API: z.string().trim().min(1).optional(),
 });
 
 export interface AppConfig {
@@ -28,6 +29,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: value.MEDIA_APP_PORT,
     dataDir: path.resolve(value.MEDIA_APP_DATA_DIR),
     region: value.MEDIA_APP_REGION,
-    ...(value.TMDB_API_KEY ? { tmdbApiKey: value.TMDB_API_KEY } : {}),
+    ...(value.TMDB_API_KEY ?? value.TMDB_API
+      ? { tmdbApiKey: value.TMDB_API_KEY ?? value.TMDB_API }
+      : {}),
   };
 }

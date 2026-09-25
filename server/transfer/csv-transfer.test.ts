@@ -10,7 +10,7 @@ describe("episode CSV transfer", () => {
           tmdbId: 99,
           mediaType: "tv",
           title: "Pattern",
-          overview: null,
+          overview: "A preserved synopsis.",
           posterPath: "/poster.jpg",
           backdropPath: null,
           releaseDate: null,
@@ -50,6 +50,7 @@ describe("episode CSV transfer", () => {
     expect(imported[0]?.item).toMatchObject({
       title: "Pattern",
       tmdbId: 99,
+      overview: "A preserved synopsis.",
       posterPath: "/poster.jpg",
       totalSeasons: 1,
     });

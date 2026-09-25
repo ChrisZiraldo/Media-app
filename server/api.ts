@@ -468,6 +468,13 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
       });
     return { imported: options.service.importLibraryCsv(request.body) };
   });
+  app.post("/api/v1/admin/backfill-synopses", async (_request, reply) => {
+    if (!options.service)
+      return reply.status(503).send({
+        error: { code: "REQUEST_ERROR", message: "Library service is not configured" },
+      });
+    return options.service.backfillMissingSynopses();
+  });
   app.delete("/api/v1/admin/data", async (request, reply) => {
     if (!options.service)
       return reply.status(503).send({

@@ -670,6 +670,8 @@ describe("Media Tracker shell", () => {
         tmdbId: 2,
         title: "Alpha",
         genre: ["Drama"],
+        favorite: true,
+        watchTogether: true,
       }),
       fetcher = vi.fn(async () => json({ items: [item(), alpha] }));
     vi.stubGlobal("fetch", fetcher);
@@ -694,6 +696,20 @@ describe("Media Tracker shell", () => {
     expect(
       screen.getByRole("columnheader", { name: /Provider/ }),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Filter by genre"));
+    fireEvent.click(screen.getByRole("button", { name: "All genres" }));
+    fireEvent.click(screen.getByLabelText("Filter by marker"));
+    fireEvent.click(screen.getAllByRole("button", { name: "Favourites" })[1]!);
+    expect(
+      screen.getByLabelText("Filter by marker").closest("details"),
+    ).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "Alpha" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Dexter" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Filter by marker"));
+    fireEvent.click(screen.getByRole("button", { name: "Watch together" }));
+    expect(screen.getByRole("button", { name: "Alpha" })).toBeInTheDocument();
   });
 
   it("opens mobile navigation as an inert dismissible drawer", async () => {

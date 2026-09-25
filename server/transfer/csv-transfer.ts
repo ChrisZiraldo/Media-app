@@ -3,6 +3,7 @@ import type { TransferShow } from "../../shared/transfer-types.js";
 export const csvHeaders = [
   "record_type",
   "title",
+  "overview",
   "year",
   "tmdb_id",
   "media_type",
@@ -36,6 +37,7 @@ export function exportCsv(shows: TransferShow[]): string {
       [
         "show",
         item.title,
+        item.overview ?? "",
         (item.releaseDate ?? item.firstAirDate)?.slice(0, 4) ?? "",
         item.tmdbId,
         item.mediaType,
@@ -67,6 +69,7 @@ export function exportCsv(shows: TransferShow[]): string {
         [
           "episode",
           item.title,
+          "",
           "",
           item.tmdbId,
           item.mediaType,
@@ -130,6 +133,7 @@ function parseRows(value: string): string[][] {
 const showSchema = z.object({
   record_type: z.literal("show"),
   title: z.string().min(1),
+  overview: z.string().default(""),
   year: z.string(),
   tmdb_id: z.coerce.number().int().positive(),
   media_type: z.enum(["movie", "tv"]),
@@ -164,7 +168,7 @@ export function importCsv(text: string): TransferShow[] {
     header = rows.shift()?.map((value) => value.trim().toLowerCase()) ?? [];
   if (
     csvHeaders
-      .filter((name) => !["favorite", "watch_together"].includes(name))
+      .filter((name) => !["overview", "favorite", "watch_together"].includes(name))
       .some((name) => !header.includes(name))
   )
     throw new Error("Missing required CSV columns");
@@ -232,7 +236,7 @@ export function importCsv(text: string): TransferShow[] {
         tmdbId: show.tmdb_id,
         mediaType: show.media_type,
         title: show.title,
-        overview: null,
+        overview: show.overview || null,
         posterPath: show.poster_path || null,
         backdropPath: show.backdrop_path || null,
         releaseDate:

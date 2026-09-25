@@ -112,6 +112,41 @@ export class MediaService {
     );
   }
 
+  async backfillMissingSynopses(): Promise<{
+    checked: number;
+    updated: number;
+    unavailable: number;
+    failed: number;
+  }> {
+    if (!this.tmdb)
+      throw new ServiceUnavailableError("TMDB synopsis backfill is not configured");
+    const missing = this.repository.listMissingSynopses();
+    let updated = 0,
+      unavailable = 0,
+      failed = 0;
+    for (let index = 0; index < missing.length; index += 5) {
+      await Promise.all(
+        missing.slice(index, index + 5).map(async (candidate) => {
+          try {
+            const item = await this.tmdb!.getDetails(
+              candidate.tmdbId,
+              candidate.mediaType,
+            );
+            const overview = item.overview?.trim();
+            if (!overview) unavailable++;
+            else {
+              this.repository.setOverview(candidate.id, overview);
+              updated++;
+            }
+          } catch {
+            failed++;
+          }
+        }),
+      );
+    }
+    return { checked: missing.length, updated, unavailable, failed };
+  }
+
   private async catalogMetadata(tmdbId: number, mediaType: "movie" | "tv") {
     if (!this.tmdb)
       throw new ServiceUnavailableError("Catalog search is not configured");
