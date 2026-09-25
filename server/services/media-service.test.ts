@@ -307,4 +307,37 @@ describe("MediaService catalog additions", () => {
     });
     database.close();
   });
+
+  it("backfills regional watch providers without changing library state", async () => {
+    const { database, repository } = setup(),
+      id = repository.addOrUpdate(details, "watchlist"),
+      getWatchProviders = vi.fn(async () => [
+        {
+          tmdbProviderId: 350,
+          name: "Apple TV Plus",
+          logoPath: "/logo.jpg",
+          region: "CA",
+          accessType: "subscription" as const,
+          displayPriority: 1,
+        },
+      ]),
+      tmdb = { getWatchProviders } as unknown as TmdbClient,
+      service = new MediaService(repository, tmdb, "CA");
+
+    await expect(service.backfillWatchProviders()).resolves.toEqual({
+      checked: 1,
+      updated: 1,
+      unavailable: 0,
+      failed: 0,
+    });
+    expect(getWatchProviders).toHaveBeenCalledWith(1405, "tv", "CA");
+    expect(service.detail(id)?.providers).toEqual([
+      expect.objectContaining({ name: "Apple TV Plus", region: "CA" }),
+    ]);
+    expect(repository.list()[0]).toMatchObject({
+      provider: "Apple TV Plus",
+      status: "watchlist",
+    });
+    database.close();
+  });
 });
