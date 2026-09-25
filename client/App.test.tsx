@@ -32,7 +32,7 @@ function item(overrides: Partial<LibraryItem> = {}): LibraryItem {
     genre: ["Crime"],
     provider: "Netflix",
     nextEpisode: "S1 E2 Crocodile",
-    nextEpisodeDate: null,
+    nextEpisodeDate: "2006-10-08",
     updatedAt: "2026-01-01T00:00:00.000Z",
     libraryView: "continue",
     ...overrides,

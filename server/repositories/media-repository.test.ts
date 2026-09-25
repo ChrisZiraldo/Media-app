@@ -360,6 +360,58 @@ describe("MediaRepository", () => {
     database.close();
   });
 
+  it("treats an undated TBD episode as unreleased", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "media-repo-"));
+    directories.push(directory);
+    const database = openDatabase(directory),
+      repository = new MediaRepository(database),
+      id = repository.addOrUpdate(
+        {
+          tmdbId: 23,
+          mediaType: "tv",
+          title: "TBD Show",
+          overview: null,
+          posterPath: null,
+          backdropPath: null,
+          releaseDate: null,
+          firstAirDate: "2025-01-01",
+          totalEpisodes: 2,
+          showStatus: "Returning Series",
+          genres: [],
+        },
+        "watching",
+      );
+    repository.upsertEpisodes(id, [
+      {
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: "Released",
+        overview: null,
+        airDate: "2025-01-01",
+        runtimeMinutes: 45,
+        stillPath: null,
+      },
+      {
+        seasonNumber: 2,
+        episodeNumber: 1,
+        title: "TBD",
+        overview: null,
+        airDate: null,
+        runtimeMinutes: null,
+        stillPath: null,
+      },
+    ]);
+    repository.setEpisodeWatched(id, 1, 1, true);
+
+    expect(repository.list({ view: "continue" })).toHaveLength(0);
+    expect(repository.list({ view: "caught-up" })[0]).toMatchObject({
+      nextEpisode: "S2 E1 · TBD",
+      nextEpisodeDate: null,
+    });
+    expect(repository.markNextAvailable(id)).toBeNull();
+    database.close();
+  });
+
   it("replaces ordered cast and region-scoped providers", () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "media-repo-"));
     directories.push(directory);

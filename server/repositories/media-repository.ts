@@ -206,7 +206,7 @@ export class MediaRepository {
   ): { seasonNumber: number; episodeNumber: number } | null {
     const row = this.database
       .prepare(
-        `SELECT e.season_number,e.episode_number FROM tv_episodes e LEFT JOIN watched_episodes w ON w.media_item_id=e.media_item_id AND w.season_number=e.season_number AND w.episode_number=e.episode_number WHERE e.media_item_id=? AND w.id IS NULL AND (e.air_date IS NULL OR e.air_date<=date('now')) ORDER BY e.season_number,e.episode_number LIMIT 1`,
+        `SELECT e.season_number,e.episode_number FROM tv_episodes e LEFT JOIN watched_episodes w ON w.media_item_id=e.media_item_id AND w.season_number=e.season_number AND w.episode_number=e.episode_number WHERE e.media_item_id=? AND w.id IS NULL AND e.air_date IS NOT NULL AND e.air_date<=date('now') ORDER BY e.season_number,e.episode_number LIMIT 1`,
       )
       .get(mediaId) as
       { season_number: number; episode_number: number } | undefined;
@@ -264,7 +264,7 @@ export class MediaRepository {
         `SELECT m.id,m.tmdb_id,m.media_type,m.title,m.release_date,m.first_air_date,m.poster_path,m.backdrop_path,m.overview,m.runtime_minutes,l.status,l.favorite,l.note,
       m.total_episodes,m.total_seasons,m.genres_json,m.provider_name,l.updated_at,m.show_status,
       COUNT(w.id) AS watched_episodes,
-      (SELECT e.episode_number FROM tv_episodes e LEFT JOIN watched_episodes we ON we.media_item_id=e.media_item_id AND we.season_number=e.season_number AND we.episode_number=e.episode_number WHERE e.media_item_id=m.id AND we.id IS NULL AND (e.air_date IS NULL OR e.air_date <= date('now')) ORDER BY e.season_number,e.episode_number LIMIT 1) AS available_episode_number,
+      (SELECT e.episode_number FROM tv_episodes e LEFT JOIN watched_episodes we ON we.media_item_id=e.media_item_id AND we.season_number=e.season_number AND we.episode_number=e.episode_number WHERE e.media_item_id=m.id AND we.id IS NULL AND e.air_date IS NOT NULL AND e.air_date <= date('now') ORDER BY e.season_number,e.episode_number LIMIT 1) AS available_episode_number,
       (SELECT e.season_number FROM tv_episodes e LEFT JOIN watched_episodes we ON we.media_item_id=e.media_item_id AND we.season_number=e.season_number AND we.episode_number=e.episode_number WHERE e.media_item_id=m.id AND we.id IS NULL ORDER BY e.season_number,e.episode_number LIMIT 1) AS next_season,
       (SELECT e.episode_number FROM tv_episodes e LEFT JOIN watched_episodes we ON we.media_item_id=e.media_item_id AND we.season_number=e.season_number AND we.episode_number=e.episode_number WHERE e.media_item_id=m.id AND we.id IS NULL ORDER BY e.season_number,e.episode_number LIMIT 1) AS next_episode_number,
       (SELECT e.title FROM tv_episodes e LEFT JOIN watched_episodes we ON we.media_item_id=e.media_item_id AND we.season_number=e.season_number AND we.episode_number=e.episode_number WHERE e.media_item_id=m.id AND we.id IS NULL ORDER BY e.season_number,e.episode_number LIMIT 1) AS next_title,

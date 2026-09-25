@@ -1943,6 +1943,11 @@ function ShowDetail({
               ? "watching"
               : detail.item.status,
     nextEpisodeNumber = detail.item.nextEpisode?.match(/^S\d+\s*E\d+/i)?.[0],
+    nextEpisodeAvailable = Boolean(
+      nextEpisodeNumber &&
+      detail.item.nextEpisodeDate &&
+      detail.item.nextEpisodeDate <= new Date().toISOString().slice(0, 10),
+    ),
     canonicalStatus = {
       watchlist: "★ Watchlist",
       watching: "★ Watching",
@@ -2128,12 +2133,12 @@ function ShowDetail({
                 <div className="hero-actions">
                   <button
                     className="primary-action"
-                    disabled={!nextEpisodeNumber || nextPending}
+                    disabled={!nextEpisodeAvailable || nextPending}
                     onClick={() => void markNextEpisode()}
                   >
                     {nextPending
                       ? "Updating…"
-                      : nextEpisodeNumber
+                      : nextEpisodeAvailable
                         ? `Mark ${nextEpisodeNumber} watched`
                         : "All available episodes watched"}
                   </button>
