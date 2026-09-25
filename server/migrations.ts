@@ -95,6 +95,10 @@ const migrations: Migration[] = [
     version: 4,
     sql: `ALTER TABLE library_entries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0 CHECK (favorite IN (0,1));`,
   },
+  {
+    version: 5,
+    sql: `ALTER TABLE library_entries ADD COLUMN watch_together INTEGER NOT NULL DEFAULT 0 CHECK (watch_together IN (0,1));`,
+  },
 ];
 
 export function runMigrations(database: Database.Database): void {

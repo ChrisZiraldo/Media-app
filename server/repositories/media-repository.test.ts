@@ -553,13 +553,17 @@ describe("MediaRepository", () => {
       );
     repository.setNote(id, "Remember this episode");
     repository.setFavorite(id, true);
+    repository.setWatchTogether(id, true);
     expect(repository.list()[0]).toMatchObject({
       note: "Remember this episode",
       favorite: true,
+      watchTogether: true,
       overview: "A useful synopsis.",
     });
     repository.setFavorite(id, false);
+    repository.setWatchTogether(id, false);
     expect(repository.list()[0]?.favorite).toBe(false);
+    expect(repository.list()[0]?.watchTogether).toBe(false);
     repository.setNote(id, null);
     expect(repository.list()[0]?.note).toBeNull();
     database.close();

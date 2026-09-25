@@ -32,6 +32,7 @@ interface LibraryRow {
   note: string | null;
   status: LibraryStatus;
   favorite: number;
+  watch_together: number;
   total_episodes: number | null;
   total_seasons: number | null;
   genres_json: string;
@@ -196,6 +197,17 @@ export class MediaRepository {
         statusCode: 404,
       });
   }
+  setWatchTogether(mediaId: string, watchTogether: boolean): void {
+    const result = this.database
+      .prepare(
+        "UPDATE library_entries SET watch_together=?,updated_at=? WHERE media_item_id=?",
+      )
+      .run(watchTogether ? 1 : 0, new Date().toISOString(), mediaId);
+    if (result.changes === 0)
+      throw Object.assign(new Error("Library item not found"), {
+        statusCode: 404,
+      });
+  }
   deleteAllData(): void {
     this.database.transaction(() => {
       this.database.prepare("DELETE FROM media_items").run();
@@ -261,7 +273,7 @@ export class MediaRepository {
   list(query: LibraryQuery = {}): LibraryItem[] {
     const rows = this.database
       .prepare(
-        `SELECT m.id,m.tmdb_id,m.media_type,m.title,m.release_date,m.first_air_date,m.poster_path,m.backdrop_path,m.overview,m.runtime_minutes,l.status,l.favorite,l.note,
+        `SELECT m.id,m.tmdb_id,m.media_type,m.title,m.release_date,m.first_air_date,m.poster_path,m.backdrop_path,m.overview,m.runtime_minutes,l.status,l.favorite,l.watch_together,l.note,
       m.total_episodes,m.total_seasons,m.genres_json,m.provider_name,l.updated_at,m.show_status,
       COUNT(w.id) AS watched_episodes,
       (SELECT e.episode_number FROM tv_episodes e LEFT JOIN watched_episodes we ON we.media_item_id=e.media_item_id AND we.season_number=e.season_number AND we.episode_number=e.episode_number WHERE e.media_item_id=m.id AND we.id IS NULL AND e.air_date IS NOT NULL AND e.air_date <= date('now') ORDER BY e.season_number,e.episode_number LIMIT 1) AS available_episode_number,
@@ -316,6 +328,7 @@ export class MediaRepository {
           showStatus: row.show_status,
           status: row.status,
           favorite: row.favorite === 1,
+          watchTogether: row.watch_together === 1,
           note: row.note,
           watchedEpisodes: row.watched_episodes,
           totalEpisodes: row.total_episodes,
@@ -683,7 +696,7 @@ export class MediaRepository {
   exportSnapshot(): TransferShow[] {
     const rows = this.database
       .prepare(
-        "SELECT m.*,l.status,l.favorite,l.updated_at AS library_updated_at FROM media_items m JOIN library_entries l ON l.media_item_id=m.id ORDER BY lower(m.title)",
+        "SELECT m.*,l.status,l.favorite,l.watch_together,l.updated_at AS library_updated_at FROM media_items m JOIN library_entries l ON l.media_item_id=m.id ORDER BY lower(m.title)",
       )
       .all() as Array<Record<string, unknown>>;
     return rows.map((row) => ({
@@ -715,6 +728,7 @@ export class MediaRepository {
       },
       status: row.status as LibraryStatus,
       favorite: Number(row.favorite) === 1,
+      watchTogether: Number(row.watch_together) === 1,
       currentSeason:
         row.total_seasons === null ? null : Number(row.total_seasons),
       updatedAt: String(row.library_updated_at),

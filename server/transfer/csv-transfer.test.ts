@@ -23,6 +23,7 @@ describe("episode CSV transfer", () => {
         },
         status: "watching",
         favorite: true,
+        watchTogether: true,
         currentSeason: 1,
         updatedAt: "2026-08-23T12:00:00.000Z",
         episodes: Array.from({ length: 5 }, (_, index) => ({
@@ -53,6 +54,7 @@ describe("episode CSV transfer", () => {
       totalSeasons: 1,
     });
     expect(imported[0]?.favorite).toBe(true);
+    expect(imported[0]?.watchTogether).toBe(true);
   });
   it("rejects mismatched episode totals before persistence", () => {
     const csv = exportCsv([
@@ -71,6 +73,7 @@ describe("episode CSV transfer", () => {
         },
         status: "watchlist",
         favorite: false,
+        watchTogether: false,
         currentSeason: 1,
         updatedAt: "2026-08-23T12:00:00.000Z",
         episodes: [],

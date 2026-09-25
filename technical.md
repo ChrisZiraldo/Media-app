@@ -407,7 +407,8 @@ The `shows` view may additionally filter canonical status `stopped`; Stopped is
 not a standalone derived-view route.
 The view endpoint returns show-level rows shaped for the Compact Tracker tables,
 including poster path, derived progress, current season, genre, provider/network,
-next episode, relevant activity date, and derived view label. The server validates
+next episode, relevant activity date, derived view label, `favorite`, and
+`watchTogether`. The server validates
 sort and filter keys against the selected view rather than accepting arbitrary
 SQL fields. Title uses direct A/Z sorting; progress, next episode, and activity
 dates use direct two-direction toggles. Genre and provider are filter-only, and
@@ -446,7 +447,7 @@ same normalized UTF-8 schema. A `show` record preserves library metadata and an
 `episode` record preserves the state of one specific episode:
 
 ```csv
-record_type,title,year,airing_status,library_view,current_season,total_episodes,next_episode,last_updated,genre,provider_network,poster_url,season_number,episode_number,episode_title,air_date,watched,watched_at
+record_type,title,year,tmdb_id,media_type,airing_status,library_status,favorite,watch_together,current_season,total_episodes,last_updated,genre,network,poster_path,backdrop_path,season_number,episode_number,episode_title,air_date,runtime_minutes,still_path,watched,watched_at
 ```
 
 Every exported show has exactly one `show` record and exactly one `episode`
@@ -457,6 +458,9 @@ from episode records and is never imported as an aggregate. This preserves
 non-sequential viewing such as S1 E1, S1 E3, and S1 E5 without implying that
 S1 E2 or S1 E4 was watched. Episode titles and air dates are included when
 known so a subsequent import can restore the same local snapshot.
+The show record also persists independent `favorite` and `watch_together`
+booleans. During import, either a true imported flag or a true existing flag wins.
+Older CSV files may omit either optional preference column.
 
 `library_view` accepts `continue`, `caught-up`, `watchlist`, `finished`, or
 `stopped`.
@@ -797,3 +801,6 @@ interval such as 30 minutes.
 - Local HTTP, Tailnet HTTP, and MCP checks pass after deployment.
 - Favourites filters the All shows response by the persisted `favorite` flag;
   the show-detail star toggles that flag through the library PATCH endpoint.
+- Watch Together uses the persisted `watch_together` flag. Show detail toggles
+  it through the same PATCH endpoint, and every library table renders it in the
+  unlabeled marker column immediately after Title.

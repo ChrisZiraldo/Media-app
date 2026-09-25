@@ -86,11 +86,16 @@
   font-weight: 750;
   letter-spacing: 0.05em;
 }
-.favorite-toggle {
+.detail-preference-actions {
   position: absolute;
   z-index: 2;
   top: 22px;
   right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preference-toggle {
   display: grid;
   width: 44px;
   height: 44px;
@@ -107,7 +112,48 @@
 .favorite-toggle.selected {
   color: #e3c56e;
 }
-.favorite-toggle:disabled {
+.favorite-toggle {
+  font-size: 2rem;
+  transform: translateY(-2px);
+}
+.watch-together-toggle {
+  color: #f3f6f7;
+}
+.watch-together-toggle:hover,
+.watch-together-toggle.selected {
+  color: #b894f6;
+}
+.watch-together-icon {
+  width: 27px;
+  height: 27px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.watch-together-icon.selected .person-left {
+  fill: #8b5cf6;
+  stroke: #8b5cf6;
+}
+.watch-together-icon.selected .person-right {
+  fill: #c084fc;
+  stroke: #c084fc;
+}
+.watch-together-icon.selected .arm-left {
+  stroke: #c084fc;
+  stroke-width: 2;
+}
+.watch-together-icon.selected .arm-right {
+  stroke: #8b5cf6;
+  stroke-width: 2;
+}
+.watch-together-icon.selected .icon-embrace {
+  stroke: #f3e8ff;
+  stroke-width: 1.65;
+}
+.preference-toggle:disabled {
   cursor: wait;
   opacity: 0.65;
 }
@@ -195,10 +241,10 @@
   background: #151d22;
   color: #dbe2e6;
 }
-.show-detail .favorite-toggle,
-.show-detail .favorite-toggle:hover,
-.show-detail .favorite-toggle:focus,
-.show-detail .favorite-toggle:active {
+.show-detail .preference-toggle,
+.show-detail .preference-toggle:hover,
+.show-detail .preference-toggle:focus,
+.show-detail .preference-toggle:active {
   padding: 0;
   border: 0;
   border-radius: 0;

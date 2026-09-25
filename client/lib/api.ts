@@ -94,6 +94,12 @@ export const api = {
       body: JSON.stringify({ favorite }),
     });
   },
+  watchTogether(id: string, watchTogether: boolean): Promise<void> {
+    return request(`/api/v1/library/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ watchTogether }),
+    });
+  },
   start(id: string): Promise<unknown> {
     return request(`/api/v1/library/${id}/actions/start`, { method: "POST" });
   },

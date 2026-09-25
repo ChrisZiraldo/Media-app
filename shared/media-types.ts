@@ -20,6 +20,7 @@ export interface LibraryItem {
   showStatus: string | null;
   status: LibraryStatus;
   favorite: boolean;
+  watchTogether: boolean;
   note: string | null;
   watchedEpisodes: number;
   totalEpisodes: number | null;

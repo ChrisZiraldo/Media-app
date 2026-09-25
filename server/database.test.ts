@@ -18,12 +18,12 @@ describe("database", () => {
     expect(first.pragma("foreign_keys", { simple: true })).toBe(1);
     expect(
       first.prepare("SELECT MAX(version) AS version FROM schema_version").get(),
-    ).toEqual({ version: 4 });
+    ).toEqual({ version: 5 });
     first.close();
     const second = openDatabase(directory);
     expect(
       second.prepare("SELECT COUNT(*) AS count FROM schema_version").get(),
-    ).toEqual({ count: 4 });
+    ).toEqual({ count: 5 });
     second.close();
   });
 });

@@ -18,6 +18,8 @@ describe("HTTP application", () => {
   it("serves a compiled client when a static root is provided", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "media-static-"));
     fs.writeFileSync(path.join(root, "index.html"), "<h1>Media Tracker</h1>");
+    fs.mkdirSync(path.join(root, "assets"));
+    fs.writeFileSync(path.join(root, "assets", "app.js"), "export {};");
     const app = createApp({ staticRoot: root });
     const response = await app.inject({ method: "GET", url: "/" });
     expect(response.statusCode).toBe(200);
@@ -33,6 +35,18 @@ describe("HTTP application", () => {
     expect(detail.statusCode).toBe(200);
     expect(cast.statusCode).toBe(200);
     expect(detail.body).toContain("Media Tracker");
+    const prefixedPage = await app.inject({ method: "GET", url: "/media/" });
+    const prefixedAsset = await app.inject({
+      method: "GET",
+      url: "/media/assets/app.js",
+    });
+    const prefixedApi = await app.inject({
+      method: "GET",
+      url: "/media/health",
+    });
+    expect(prefixedPage.statusCode).toBe(200);
+    expect(prefixedAsset.statusCode).toBe(200);
+    expect(prefixedApi.json()).toEqual({ ok: true });
     await app.close();
     fs.rmSync(root, { recursive: true, force: true });
   });
@@ -221,6 +235,7 @@ describe("HTTP application", () => {
         setStatus: vi.fn(),
         setNote: vi.fn(),
         setFavorite: vi.fn(),
+        setWatchTogether: vi.fn(),
         startWatching: vi.fn(() => ({ episodeNumber: 1 })),
         markNext: vi.fn(() => ({ episodeNumber: 2 })),
         refreshFromCatalog: vi.fn(async () => undefined),
@@ -246,7 +261,12 @@ describe("HTTP application", () => {
       {
         method: "PATCH",
         url: `/api/v1/library/${id}`,
-        payload: { status: "watching", note: "  note  ", favorite: true },
+        payload: {
+          status: "watching",
+          note: "  note  ",
+          favorite: true,
+          watchTogether: true,
+        },
         expected: 204,
       },
       {
@@ -314,6 +334,7 @@ describe("HTTP application", () => {
     expect(service.setStatus).toHaveBeenCalledWith(id, "watching");
     expect(service.setNote).toHaveBeenCalledWith(id, "note");
     expect(service.setFavorite).toHaveBeenCalledWith(id, true);
+    expect(service.setWatchTogether).toHaveBeenCalledWith(id, true);
     expect(service.setEpisodeWatched).toHaveBeenNthCalledWith(
       1,
       id,

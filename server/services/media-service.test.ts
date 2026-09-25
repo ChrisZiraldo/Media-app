@@ -64,6 +64,7 @@ describe("MediaService catalog additions", () => {
           item: { ...details, totalEpisodes: 2 },
           status: "watching",
           favorite: false,
+          watchTogether: false,
           currentSeason: 1,
           updatedAt: "2026-08-24T12:00:00.000Z",
           episodes,
@@ -99,6 +100,7 @@ describe("MediaService catalog additions", () => {
           item: { ...details, totalEpisodes: 2 },
           status: "watching",
           favorite: false,
+          watchTogether: false,
           currentSeason: 1,
           updatedAt: "2026-08-24T12:00:00.000Z",
           episodes: episodes.map((episode) => ({

@@ -294,7 +294,10 @@ Library-view table columns are tailored to the decision being made:
 - Finished: title, genre, provider, last updated, status, and an unlabeled
   quick-action column; progress is omitted because completion is already
   guaranteed by the view definition.
-- All shows: title, library view, progress, genre, provider, next episode, last
+- All library tables place a narrow, unlabeled marker column immediately after
+  title. It shows a gold star for a favourite, a two-person hugging icon for a
+  Watch Together show, both icons when both flags apply, or remains empty.
+- All shows: title, marker, library view, progress, genre, provider, next episode, last
   updated, and an unlabeled quick-action column.
 
 Every visible Progress cell places a bold `Season {number}` and the regular-
@@ -345,7 +348,8 @@ horizontally rather than wrapping at narrow widths. View full cast opens a
 dedicated cast-only page with a responsive grid and a return link to the show. The
 page supports marking one episode, toggling the full displayed season, toggling
 the entire show after confirmation, reversing an episode check, and updating
-progress without leaving the page.
+progress without leaving the page. The top-right controls include the existing
+favourite star and an adjacent two-person hugging toggle for Watch Together.
 
 ### Quick watched-action prototype
 

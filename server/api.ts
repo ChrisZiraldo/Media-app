@@ -59,12 +59,14 @@ const updateLibrarySchema = z
     status: libraryStatusSchema.optional(),
     note: noteSchema,
     favorite: z.boolean().optional(),
+    watchTogether: z.boolean().optional(),
   })
   .refine(
     (value) =>
       value.status !== undefined ||
       value.note !== undefined ||
-      value.favorite !== undefined,
+      value.favorite !== undefined ||
+      value.watchTogether !== undefined,
   );
 const episodeParamsSchema = z.object({
   id: z.string().uuid(),
@@ -81,7 +83,17 @@ const deleteAllDataSchema = z.object({
 });
 
 export function createApp(options: AppOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: false, bodyLimit: 12 * 1024 * 1024 });
+  const app = Fastify({
+    logger: false,
+    bodyLimit: 12 * 1024 * 1024,
+    rewriteUrl(request) {
+      const url = request.url ?? "";
+      if (url === "/media/api" || url.startsWith("/media/api/"))
+        return url.slice("/media".length);
+      if (url === "/media/health") return "/health";
+      return url;
+    },
+  });
   app.addContentTypeParser(
     ["text/csv", "application/csv"],
     { parseAs: "string" },
@@ -199,6 +211,8 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
       options.service.setNote(id, input.note?.trim() || null);
     if (input.favorite !== undefined)
       options.service.setFavorite(id, input.favorite);
+    if (input.watchTogether !== undefined)
+      options.service.setWatchTogether(id, input.watchTogether);
     return reply.status(204).send();
   });
   app.post("/api/v1/library/:id/actions/start", async (request, reply) => {
@@ -467,10 +481,27 @@ export function createApp(options: AppOptions = {}): FastifyInstance {
     return reply.status(204).send();
   });
   if (options.staticRoot) {
-    void app.register(fastifyStatic, { root: options.staticRoot });
+    void app.register(fastifyStatic, {
+      root: options.staticRoot,
+      prefix: "/media/",
+    });
     app.get("/", (_request, reply) => reply.sendFile("index.html"));
+    app.get("/media", (_request, reply) => reply.redirect("/media/"));
+    app.get("/media/", (_request, reply) => reply.sendFile("index.html"));
     app.get("/shows/:id", (_request, reply) => reply.sendFile("index.html"));
+    app.get("/media/shows/:id", (_request, reply) =>
+      reply.sendFile("index.html"),
+    );
     app.get("/shows/:id/cast", (_request, reply) =>
+      reply.sendFile("index.html"),
+    );
+    app.get("/media/shows/:id/cast", (_request, reply) =>
+      reply.sendFile("index.html"),
+    );
+    app.get("/media/catalog/:type/:tmdbId", (_request, reply) =>
+      reply.sendFile("index.html"),
+    );
+    app.get("/media/catalog/:type/:tmdbId/cast", (_request, reply) =>
       reply.sendFile("index.html"),
     );
   }

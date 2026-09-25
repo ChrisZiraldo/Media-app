@@ -8,6 +8,7 @@ export interface TransferShow {
   item: CatalogMedia;
   status: LibraryStatus;
   favorite: boolean;
+  watchTogether: boolean;
   currentSeason: number | null;
   updatedAt: string;
   episodes: TransferEpisode[];

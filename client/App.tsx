@@ -681,6 +681,30 @@ function Poster({ path }: { path: string | null }) {
     </div>
   );
 }
+
+function WatchTogetherIcon({ selected = false }: { selected?: boolean }) {
+  return (
+    <svg
+      className={`watch-together-icon ${selected ? "selected" : ""}`}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle className="person-left" cx="8" cy="7" r="3" />
+      <circle className="person-right" cx="16" cy="7" r="3" />
+      <path
+        className="icon-body person-left"
+        d="M3 20v-2.4A5.6 5.6 0 0 1 8.6 12H10l2 2.1-2.3 2.2A2.5 2.5 0 0 0 8 15.5c-1.1 0-2 .9-2 2V20Z"
+      />
+      <path
+        className="icon-body person-right"
+        d="M21 20v-2.4a5.6 5.6 0 0 0-5.6-5.6H14l-2 2.1 2.3 2.2a2.5 2.5 0 0 1 1.7-.8c1.1 0 2 .9 2 2V20Z"
+      />
+      <path className="icon-arms arm-left" d="M6.1 14.9c1.6.1 2.8 3 5.9 3" />
+      <path className="icon-arms arm-right" d="M17.9 14.9c-1.6.1-2.8 3-5.9 3" />
+      <path className="icon-embrace" d="M8.2 19.3c1-1 2.3-1.5 3.8-1.5s2.8.5 3.8 1.5" />
+    </svg>
+  );
+}
 function LibraryTable({
   items,
   view,
@@ -850,6 +874,7 @@ function LibraryTable({
                 </button>
               </span>
             </th>
+            <th className="marker-column" aria-label="Show markers"></th>
             {showsLibraryView && (
               <th>
                 <span className="column-heading">
@@ -941,7 +966,7 @@ function LibraryTable({
         <tbody>
           {visible.length === 0 && hasFilters && (
             <tr>
-              <td colSpan={8}>
+              <td colSpan={9}>
                 <div className="filter-empty">
                   <span>No titles match these filters.</span>
                   <button
@@ -972,6 +997,20 @@ function LibraryTable({
                     <span>{item.year ?? "Year unavailable"}</span>
                   </div>
                 </div>
+              </td>
+              <td className="marker-column">
+                <span className="show-markers">
+                  {item.favorite && (
+                    <span className="favorite-marker" title="Favourite" aria-label="Favourite">
+                      ★
+                    </span>
+                  )}
+                  {item.watchTogether && (
+                    <span title="Watch together" aria-label="Watch together">
+                      <WatchTogetherIcon selected />
+                    </span>
+                  )}
+                </span>
               </td>
               {showsLibraryView && (
                 <td>
@@ -1865,7 +1904,9 @@ function ShowDetail({
     [nextPending, setNextPending] = useState(false),
     [nextError, setNextError] = useState(""),
     [favoritePending, setFavoritePending] = useState(false),
-    [favoriteError, setFavoriteError] = useState("");
+    [favoriteError, setFavoriteError] = useState(""),
+    [watchTogetherPending, setWatchTogetherPending] = useState(false),
+    [watchTogetherError, setWatchTogetherError] = useState("");
   const [selectedPerson, setSelectedPerson] = useState<CastMember | null>(null),
     [selectedEpisode, setSelectedEpisode] = useState<EpisodeState | null>(null);
   const refresh = () => api.detail(id).then(setDetail);
@@ -2043,6 +2084,19 @@ function ShowDetail({
       setFavoritePending(false);
     }
   }
+  async function toggleWatchTogether() {
+    setWatchTogetherPending(true);
+    setWatchTogetherError("");
+    try {
+      await api.watchTogether(id, !detail!.item.watchTogether);
+      await refresh();
+      await onLibraryChanged();
+    } catch {
+      setWatchTogetherError("Couldn’t update watch together. Try again.");
+    } finally {
+      setWatchTogetherPending(false);
+    }
+  }
   async function toggleShow() {
     setShowPending(true);
     setShowError("");
@@ -2084,19 +2138,34 @@ function ShowDetail({
           } as CSSProperties
         }
       >
-        <button
-          className={`favorite-toggle ${detail.item.favorite ? "selected" : ""}`}
-          aria-label={
-            detail.item.favorite
-              ? `Remove ${detail.item.title} from favourites`
-              : `Add ${detail.item.title} to favourites`
-          }
-          aria-pressed={detail.item.favorite}
-          disabled={favoritePending}
-          onClick={() => void toggleFavorite()}
-        >
-          {detail.item.favorite ? "★" : "☆"}
-        </button>
+        <div className="detail-preference-actions">
+          <button
+            className={`preference-toggle watch-together-toggle ${detail.item.watchTogether ? "selected" : ""}`}
+            aria-label={
+              detail.item.watchTogether
+                ? `Remove ${detail.item.title} from watch together`
+                : `Add ${detail.item.title} to watch together`
+            }
+            aria-pressed={detail.item.watchTogether}
+            disabled={watchTogetherPending}
+            onClick={() => void toggleWatchTogether()}
+          >
+            <WatchTogetherIcon selected={detail.item.watchTogether} />
+          </button>
+          <button
+            className={`preference-toggle favorite-toggle ${detail.item.favorite ? "selected" : ""}`}
+            aria-label={
+              detail.item.favorite
+                ? `Remove ${detail.item.title} from favourites`
+                : `Add ${detail.item.title} to favourites`
+            }
+            aria-pressed={detail.item.favorite}
+            disabled={favoritePending}
+            onClick={() => void toggleFavorite()}
+          >
+            {detail.item.favorite ? "★" : "☆"}
+          </button>
+        </div>
         <div
           className="detail-hero-content"
           style={
@@ -2164,6 +2233,11 @@ function ShowDetail({
             {favoriteError && (
               <p className="hero-action-error" role="alert">
                 {favoriteError}
+              </p>
+            )}
+            {watchTogetherError && (
+              <p className="hero-action-error" role="alert">
+                {watchTogetherError}
               </p>
             )}
           </div>

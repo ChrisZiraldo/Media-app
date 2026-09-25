@@ -43,6 +43,32 @@
   max-width: 200px;
   white-space: normal;
 }
+.marker-column {
+  width: 54px;
+  min-width: 54px;
+  padding-inline: 4px !important;
+  text-align: center;
+}
+.show-markers {
+  display: inline-flex;
+  min-width: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.favorite-marker {
+  color: #e3c56e;
+  font-size: 1.25rem;
+  transform: translateY(-1px);
+}
+.show-markers .watch-together-icon {
+  width: 19px;
+  height: 19px;
+  color: #b894f6;
+}
 .genre-cell > span {
   display: block;
   line-height: 1.35;

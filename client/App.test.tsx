@@ -25,6 +25,7 @@ function item(overrides: Partial<LibraryItem> = {}): LibraryItem {
     showStatus: "Ended",
     status: "watching",
     favorite: false,
+    watchTogether: false,
     note: null,
     watchedEpisodes: 1,
     totalEpisodes: 2,
@@ -92,7 +93,7 @@ describe("Media Tracker shell", () => {
   it("lists starred shows under the User favourites view", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request) =>
       String(input).includes("libraryView=shows")
-        ? json({ items: [item({ favorite: true })] })
+        ? json({ items: [item({ favorite: true, watchTogether: true })] })
         : json({ items: [] }),
     );
     vi.stubGlobal("fetch", fetcher);
@@ -104,6 +105,8 @@ describe("Media Tracker shell", () => {
       await screen.findByRole("heading", { name: "Favourites" }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Dexter" })).toBeVisible();
+    expect(screen.getByLabelText("Favourite")).toBeVisible();
+    expect(screen.getByLabelText("Watch together")).toBeVisible();
     expect(screen.getByRole("heading", { name: "User" })).toBeVisible();
   });
 
@@ -146,6 +149,7 @@ describe("Media Tracker shell", () => {
   it("matches the balanced detail hierarchy", async () => {
     const detail = showDetail();
     let favorite = false;
+    let watchTogether = false;
     detail.item.status = "watched";
     detail.providers = [
       {
@@ -162,10 +166,19 @@ describe("Media Tracker shell", () => {
       vi.fn(async (input: string | URL | Request, init) => {
         if (String(input).endsWith(`/api/v1/library/${id}`)) {
           if (init?.method === "PATCH") {
-            favorite = true;
+            const body = JSON.parse(String(init.body)) as {
+              favorite?: boolean;
+              watchTogether?: boolean;
+            };
+            if (body.favorite !== undefined) favorite = body.favorite;
+            if (body.watchTogether !== undefined)
+              watchTogether = body.watchTogether;
             return new Response(null, { status: 204 });
           }
-          return json({ ...detail, item: { ...detail.item, favorite } });
+          return json({
+            ...detail,
+            item: { ...detail.item, favorite, watchTogether },
+          });
         }
         return json({ items: [] });
       }),
@@ -197,6 +210,14 @@ describe("Media Tracker shell", () => {
         name: "Remove Dexter from favourites",
       }),
     ).toHaveTextContent("★");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add Dexter to watch together" }),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Remove Dexter from watch together",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("renders prototype-style Diary and Upcoming rows", async () => {

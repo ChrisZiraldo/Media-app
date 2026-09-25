@@ -163,6 +163,9 @@ export class MediaService {
   setFavorite(id: string, favorite: boolean): void {
     this.repository.setFavorite(id, favorite);
   }
+  setWatchTogether(id: string, watchTogether: boolean): void {
+    this.repository.setWatchTogether(id, watchTogether);
+  }
   markNext(id: string) {
     return this.repository.markNextAvailable(id);
   }
@@ -272,6 +275,10 @@ export class MediaService {
         this.repository.setFavorite(
           id,
           Boolean(current?.favorite) || show.favorite,
+        );
+        this.repository.setWatchTogether(
+          id,
+          Boolean(current?.watchTogether) || show.watchTogether,
         );
         this.repository.setLibraryUpdatedAt(id, show.updatedAt);
       }
